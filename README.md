@@ -18,33 +18,98 @@ Aplikasi Laravel yang membantu mahasiswa menyusun skripsi/proposal: AI menganali
 
 ## Instalasi
 
+### 0. Prasyarat
+
+- PHP **8.2+** dengan ekstensi: `cli, xml, zip, gd, mbstring, curl, pdo_sqlite/pdo_mysql`
+- **Composer**
+- (Opsional) [Ollama](https://ollama.com) untuk AI lokal gratis
+
+Install Composer (kalau belum ada):
+
 ```bash
-# 1. Buat project Laravel baru
+# Linux/macOS
+curl -sS https://getcomposer.org/installer | php
+sudo mv composer.phar /usr/local/bin/composer
+
+# Windows: unduh Composer-Setup.exe dari https://getcomposer.org
+```
+
+Cek: `composer --version`
+
+Ekstensi PHP yang dibutuhkan (Debian/Ubuntu):
+
+```bash
+sudo apt install php8.3-zip php8.3-gd php8.3-xml php8.3-curl php8.3-mbstring
+```
+
+### 1. Buat project + dependensi
+
+```bash
+# Buat project Laravel baru
 laravel new skripsi-ai
+# atau: composer create-project laravel/laravel skripsi-ai
 cd skripsi-ai
 
-# 2. Aktifkan route API + queue database
+# Aktifkan route API + queue database
 php artisan install:api
 php artisan install:database  # atau konfigurasi .env + php artisan migrate
 
-# 3. Dependensi proyek
-composer require phpoffice/phpword
+# Dependensi proyek
+composer require phpoffice/phpword   # parse & export DOCX + highlight warna
+composer require guzzlehttp/guzzle    # HTTP client untuk semua driver AI (default Laravel, pastikan ada)
 
-# 4. Salin file-file repo ini ke path yang sama (lihat struktur di bawah)
-#    lalu daftarkan provider:
-#    bootstrap/providers.php -> tambahkan: App\Providers\AiServiceProvider::class
-
-# 5. Salin env
-cat env.example.additions >> .env
-
-# 6. Migrasi tabel
-php artisan migrate
-
-# 7. Jalankan worker (review AI diproses via queue)
-php artisan queue:work
+# Opsional: Redis queue
+# composer require predis/predis
 ```
 
-Minimal isi satu API key di `.env` (mis. `OPENAI_API_KEY`), atau gunakan Ollama lokal gratis (`OLLAMA_*`).
+> Facade `Http::` Laravel membutuhkan Guzzle (Laravel 11+ sudah include). Yang **wajib** tambahan hanya `phpoffice/phpword`.
+
+### 2. Salin file repo & daftarkan provider
+
+Salin folder `app/`, `config/`, `database/migrations/`, `routes/`, dan `resources/js/` dari repo ini ke path yang sama di project, lalu:
+
+```bash
+composer dump-autoload   # regenerate autoload untuk class baru di app/Services
+```
+
+Daftarkan provider di `bootstrap/providers.php`:
+
+```php
+return [
+    App\Providers\AppServiceProvider::class,
+    App\Providers\AiServiceProvider::class,
+];
+```
+
+### 3. Environment & migrasi
+
+```bash
+cp .env.example .env
+php artisan key:generate
+cat env.example.additions >> .env   # tambah GEMINI_API_KEY, OPENAI_API_KEY, dll.
+php artisan migrate
+php artisan storage:link           # supaya file upload/DOCX bisa diakses
+```
+
+### 4. Jalankan
+
+```bash
+php artisan serve       # server API
+php artisan queue:work  # WAJIB di terminal terpisah: review AI diproses via queue
+```
+
+Minimal isi satu API key di `.env` (mis. `GEMINI_API_KEY` atau `OPENAI_API_KEY`), atau gunakan Ollama lokal gratis (`OLLAMA_*`).
+
+### 5. Troubleshooting instalasi
+
+| Error | Solusi |
+| --- | --- |
+| `class "App\Providers\AiServiceProvider" not found` | `composer dump-autoload`, pastikan sudah didaftarkan di `bootstrap/providers.php` |
+| `ext-zip missing` saat install phpword | `sudo apt install php8.3-zip` lalu ulangi `composer require` |
+| `ext-gd missing` | `sudo apt install php8.3-gd` |
+| `ext-dom missing` | `sudo apt install php8.3-xml` |
+| Review tidak pernah selesai | queue tidak jalan — jalankan `php artisan queue:work` |
+| `could not find driver` (database) | aktifkan `pdo_sqlite`/`pdo_mysql` sesuai koneksi di `.env` |
 
 ## Struktur file tambahan
 
