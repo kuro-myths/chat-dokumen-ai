@@ -64,13 +64,18 @@ composer require guzzlehttp/guzzle    # HTTP client untuk semua driver AI (defau
 
 > Facade `Http::` Laravel membutuhkan Guzzle (Laravel 11+ sudah include). Yang **wajib** tambahan hanya `phpoffice/phpword`.
 
-### 2. Salin file repo & daftarkan provider
+### 2. Clone repo ini & install dependensi langsung
 
-Salin folder `app/`, `config/`, `database/migrations/`, `routes/`, dan `resources/js/` dari repo ini ke path yang sama di project, lalu:
+Repo ini sudah menyertakan `composer.json` lengkap, jadi cukup:
 
 ```bash
-composer dump-autoload   # regenerate autoload untuk class baru di app/Services
+git clone https://github.com/kuro-myths/chat-dokumen-ai.git skripsi-ai
+cd skripsi-ai
+composer install          # generate vendor/ (laravel/framework, phpword, guzzle, sanctum, dst.)
+composer dump-autoload    # regenerate autoload untuk class di app/Services
 ```
+
+> Catatan: repo ini berisi file tambahan di atas kerangka Laravel standar. Jika kamu mulai dari `laravel new` (Cara A di atas), salin folder `app/`, `config/`, `database/migrations/`, `routes/`, dan `resources/js/` ke path yang sama, lalu jalankan `composer dump-autoload`.
 
 Daftarkan provider di `bootstrap/providers.php`:
 
