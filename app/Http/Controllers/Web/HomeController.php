@@ -64,6 +64,7 @@ class HomeController extends Controller
         $data = $request->validate([
             'message' => ['required', 'string', 'max:8000'],
             'provider' => ['nullable', 'string', 'max:60'],
+            'model' => ['nullable', 'string', 'max:120'],
             'history' => ['nullable', 'array', 'max:20'],
             'history.*.role' => ['required_with:history', 'string', 'in:user,assistant'],
             'history.*.content' => ['required_with:history', 'string', 'max:8000'],
@@ -86,7 +87,15 @@ class HomeController extends Controller
 
         try {
             $provider = Ai::provider($data['provider'] ?? null);
-            $response = $provider->chat($messages, ['timeout' => 60]);
+
+            // Model bisa dipilih per pesan lewat dropdown model di composer.
+            // Null / kosong -> pakai model default provider (config / ai_settings).
+            $options = ['timeout' => 60];
+            if (! empty($data['model'])) {
+                $options['model'] = $data['model'];
+            }
+
+            $response = $provider->chat($messages, $options);
 
             return response()->json([
                 'ok' => true,

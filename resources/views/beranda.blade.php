@@ -77,6 +77,15 @@
                         </button>
                         <div class="cp-prov-menu" id="cp-prov-menu"></div>
                     </div>
+                    {{-- Dropdown model — sebelah dropdown provider, isinya mengikuti provider aktif --}}
+                    <div class="cp-model">
+                        <button class="cp-prov-btn" id="cp-model-btn" title="Pilih model AI">
+                            <i class="fa-solid fa-microchip"></i>
+                            <span id="cp-model-name">Model otomatis</span>
+                            <i class="fa-solid fa-chevron-down"></i>
+                        </button>
+                        <div class="cp-prov-menu cp-model-menu" id="cp-model-menu"></div>
+                    </div>
                     <span class="gen-chip" id="gen-chip" hidden></span>
                     <span class="cp-status" id="chat-status"></span>
                     <button class="cp-btn" id="btn-save-chat" title="Simpan percakapan"><i class="fa-solid fa-floppy-disk"></i></button>
@@ -299,7 +308,7 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('js/kuro.js') }}?v=20261029-5"></script>
+<script src="{{ asset('js/kuro.js') }}?v=20261029-6"></script>
 @endpush
 
 

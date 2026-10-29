@@ -32,15 +32,21 @@ class GeminiDriver implements AiProviderInterface
         return $this->name;
     }
 
-    /** gemini-2.0-flash sudah pensiun — default kini gemini-2.5-flash. */
-    protected function model(): string
+    /**
+     * Model aktif: override per-request ($options['model'] dari dropdown
+     * model di composer) -> config provider -> default gemini-2.5-flash.
+     * gemini-2.0-flash sudah pensiun — default kini gemini-2.5-flash.
+     */
+    protected function model(array $options = []): string
     {
-        return trim((string) ($this->config['model'] ?? '')) ?: 'gemini-2.5-flash';
+        return trim((string) ($options['model'] ?? ''))
+            ?: trim((string) ($this->config['model'] ?? ''))
+            ?: 'gemini-2.5-flash';
     }
 
-    protected function url(string $method): string
+    protected function url(string $method, array $options = []): string
     {
-        return self::BASE.'/models/'.$this->model().':'.$method;
+        return self::BASE.'/models/'.$this->model($options).':'.$method;
     }
 
     public function chat(array $messages, array $options = []): AiResponse
@@ -48,7 +54,7 @@ class GeminiDriver implements AiProviderInterface
         $response = Http::timeout($options['timeout'] ?? 120)
             ->acceptJson()
             ->withHeaders(['x-goog-api-key' => (string) ($this->config['api_key'] ?? '')])
-            ->post($this->url('generateContent'), $this->payload($messages, $options));
+            ->post($this->url('generateContent', $options), $this->payload($messages, $options));
 
         $this->assertOk($response);
 
@@ -75,7 +81,7 @@ class GeminiDriver implements AiProviderInterface
             raw: $data,
             usage: $data['usageMetadata'] ?? [],
             provider: $this->name,
-            model: $this->model(),
+            model: $this->model($options),
         );
     }
 
@@ -112,7 +118,7 @@ class GeminiDriver implements AiProviderInterface
     public function stream(array $messages, array $options = []): \Generator
     {
         $client = SymfonyClient::create(timeout: $options['timeout'] ?? 120);
-        $response = $client->request('POST', $this->url('streamGenerateContent').'?alt=sse', [
+        $response = $client->request('POST', $this->url('streamGenerateContent', $options).'?alt=sse', [
             'headers' => [
                 'x-goog-api-key' => (string) ($this->config['api_key'] ?? ''),
                 'Accept' => 'application/json',
