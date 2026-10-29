@@ -396,7 +396,7 @@
         modelMenu.appendChild(auto);
 
         var cache = modelCache[currentProvider];
-        var models = cache && cache.ok ? (cache.models || []) : [];
+        var models = (cache && cache.ok ? (cache.models || []) : []).filter(function (m) { return chatCapable(m.id); });
         if (!models.length) {
             var empty = document.createElement('p');
             empty.className = 'cp-model-empty';
@@ -520,6 +520,27 @@
         chatLog.scrollTop = chatLog.scrollHeight;
     }
 
+    // Model non-teks (TTS / audio / embedding / image / video) tidak bisa
+    // dipakai untuk chat & analisis — saring dari semua daftar model.
+    function chatCapable(id) {
+        return !/tts|embed|imagen|image|veo|aqa|audio|live/i.test(String(id || ''));
+    }
+
+    // ---------- Indikator "sedang mengetik" (titik 3 animasi) ----------
+    function showTyping() {
+        hideTyping();
+        var div = document.createElement('div');
+        div.className = 'msg ai typing';
+        div.innerHTML = '<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
+        chatLog.appendChild(div);
+        chatLog.scrollTop = chatLog.scrollHeight;
+    }
+
+    function hideTyping() {
+        var t = chatLog.querySelector('.msg.typing');
+        if (t && t.parentNode) t.parentNode.removeChild(t);
+    }
+
     function saveCurrent() {
         try {
             localStorage.setItem('kuro_current', JSON.stringify({
@@ -569,6 +590,7 @@
         btn.disabled = true;
         status.textContent = 'Menunggu jawaban AI…';
         kuroThinking(true, 'Kuro sedang menganalisis… 🔍');
+        showTyping(); // titik 3 — Kuro sedang mengetik
 
         fetch('/chat', {
             method: 'POST',
@@ -584,13 +606,19 @@
                 history: history.slice(0, -1).slice(-20)
             })
         }).then(function (r) { return r.json(); }).then(function (data) {
-            if (data.ok) {
+            hideTyping();
+            if (data.ok && data.content) {
                 history.push({role: 'assistant', content: data.content});
                 renderChat();
                 status.textContent = '✔ ' + data.provider + ' · ' + data.model;
                 kuroThinking(false, 'Selesai! Ada lagi? ✨');
                 speak(data.content);
                 saveCurrent();
+            } else if (data.ok) {
+                // Respons kosong — model non-teks (mis. TTS/audio) tidak bisa chat.
+                renderChat();
+                status.textContent = '';
+                kuroAlert('Model "' + shortModel(data.model) + '" tidak menghasilkan teks — pilih model chat (bukan TTS/audio) di dropdown model.');
             } else {
                 history.pop();
                 renderChat();
@@ -599,6 +627,7 @@
                 kuroAlert(data.error || 'Gagal.');
             }
         }).catch(function (e) {
+            hideTyping();
             history.pop();
             renderChat();
             status.textContent = '';
@@ -629,21 +658,25 @@
         setMode('chat');
         btn.disabled = true;
         status.textContent = 'Membuat gambar… (±10–30 detik)';
+        showTyping();
         fetch('/api/ai/generate/image', {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF},
             body: JSON.stringify({prompt: prompt})
         }).then(function (r) { return r.json(); }).then(function (data) {
             if (data.ok) {
+                hideTyping();
                 history.push({role: 'assistant', type: 'image', content: data.text || prompt, image: data.image});
                 renderChat();
                 status.textContent = '✔ Gambar dibuat · ' + data.model;
                 saveCurrent();
             } else {
+                hideTyping();
                 status.textContent = '';
                 kuroAlert(data.error || 'Gagal membuat gambar.');
             }
         }).catch(function (e) {
+            hideTyping();
             status.textContent = '';
             kuroAlert(e.message);
         }).finally(function () {
@@ -661,12 +694,14 @@
         setMode('chat');
         btn.disabled = true;
         status.textContent = 'Membuat video… (±1–2 menit)';
+        showTyping();
         fetch('/api/ai/generate/video', {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF},
             body: JSON.stringify({prompt: prompt})
         }).then(function (r) { return r.json(); }).then(function (data) {
             if (!data.ok) {
+                hideTyping();
                 status.textContent = '';
                 kuroAlert(data.error || 'Gagal membuat video.');
                 btn.disabled = false;
@@ -682,6 +717,7 @@
                     .then(function (s) {
                         if (s.ok && s.done && s.uri) {
                             clearInterval(timer);
+                            hideTyping();
                             history.push({role: 'assistant', type: 'video', content: prompt, video: s.uri});
                             renderChat();
                             status.textContent = '✔ Video siap · Veo';
@@ -690,6 +726,7 @@
                             setGenMode(null);
                         } else if (!s.ok) {
                             clearInterval(timer);
+                            hideTyping();
                             status.textContent = '';
                             kuroAlert(s.error || 'Gagal membuat video.');
                             btn.disabled = false;
@@ -701,6 +738,7 @@
                     .catch(function () {});
                 if (tries >= 45) {
                     clearInterval(timer);
+                    hideTyping();
                     status.textContent = '';
                     kuroAlert('Video terlalu lama dibuat — coba lagi nanti.');
                     btn.disabled = false;
@@ -708,6 +746,7 @@
                 }
             }, 8000);
         }).catch(function (e) {
+            hideTyping();
             status.textContent = '';
             kuroAlert(e.message);
             btn.disabled = false;
@@ -1373,7 +1412,7 @@
         var tier = tierSel ? tierSel.value : 'all';
         var n = 0;
         box.innerHTML = '';
-        availableModels.forEach(function (m) {
+        availableModels.filter(function (m) { return chatCapable(m.id); }).forEach(function (m) {
             var t = m.tier || 'unknown';
             if (tier !== 'all' && t !== tier) return;
             if (q && String(m.id).toLowerCase().indexOf(q) === -1) return;

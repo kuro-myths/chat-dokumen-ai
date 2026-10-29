@@ -85,6 +85,10 @@ class GeminiDriver implements AiProviderInterface
             if ($finish !== null && $finish !== 'STOP') {
                 throw new RuntimeException('Gemini berhenti sebelum menjawab (finishReason: '.$finish.') — coba ulangi atau ganti model.');
             }
+
+            // Model menjawab tetapi tidak ada teks — biasanya model non-teks
+            // (TTS / audio / image) yang dipakai untuk chat.
+            throw new RuntimeException('Model "'.$this->model($options).'" tidak menghasilkan teks — pilih model chat (bukan TTS/audio) di dropdown model.');
         }
 
         return new AiResponse(

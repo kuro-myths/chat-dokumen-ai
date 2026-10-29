@@ -308,7 +308,7 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('js/kuro.js') }}?v=20261029-7"></script>
+<script src="{{ asset('js/kuro.js') }}?v=20261029-8"></script>
 @endpush
 
 
