@@ -162,6 +162,7 @@
     // ---------- Provider & API Key ----------
     var providers = [];
     var currentProvider = null; // slug
+    var currentModel = null; // model aktif (null = pakai default provider)
 
     function driverLabel(p) {
         if (p.base_url) return p.driver + ' · ' + p.base_url;
@@ -199,9 +200,10 @@
             drop.appendChild(row);
         });
 
-        // Menu provider di composer
+        // Menu provider di composer + daftar model provider aktif
         renderProvMenu();
         updateProvName();
+        loadProviderModels(currentProvider);
     }
 
     function renderProvMenu() {
@@ -216,9 +218,12 @@
                 '<span class="grow">' + esc(p.name) + '<small>' + esc(p.model ? p.model : driverLabel(p)) + '</small></span>';
             item.addEventListener('click', function () {
                 currentProvider = p.slug;
+                currentModel = null; // ganti provider -> reset pilihan model
+                saveModelChoice();
                 menu.classList.remove('open');
                 renderProvMenu();
                 updateProvName();
+                loadProviderModels(p.slug);
                 kuroThinking(false, 'Provider aktif: ' + p.name + ' ✨');
             });
             menu.appendChild(item);
@@ -340,6 +345,135 @@
         }
     });
 
+    // ---------- Dropdown model (sebelah dropdown provider) ----------
+    var modelMenu = document.getElementById('cp-model-menu');
+    var modelBtn = document.getElementById('cp-model-btn');
+    var modelCache = {}; // slug provider -> {ok, models, error}
+
+    // Pilihan model tersimpan per browser — dipakai ulang bila masih ada di provider aktif.
+    try { currentModel = localStorage.getItem('kuro_model') || null; } catch (e) {}
+
+    function saveModelChoice() {
+        try { localStorage.setItem('kuro_model', currentModel || ''); } catch (e) {}
+    }
+
+    function shortModel(id) {
+        return String(id || '').replace(/^models\//, '');
+    }
+
+    function updateModelName() {
+        var el = document.getElementById('cp-model-name');
+        if (!el) return;
+        el.textContent = currentModel ? shortModel(currentModel) : 'Model otomatis';
+        el.title = currentModel ? currentModel : 'Pakai model default provider aktif';
+    }
+
+    function renderModelMenu() {
+        if (!modelMenu) return;
+        modelMenu.innerHTML = '';
+        var provName = 'provider ini';
+        providers.forEach(function (p) { if (p.slug === currentProvider) provName = p.name; });
+
+        var head = document.createElement('div');
+        head.className = 'cp-model-head';
+        head.textContent = 'Model di ' + provName;
+        modelMenu.appendChild(head);
+
+        // Opsi pertama: ikuti model default provider (tanpa override)
+        var auto = document.createElement('button');
+        auto.type = 'button';
+        auto.className = 'cp-prov-item';
+        auto.innerHTML =
+            '<i class="fa-solid fa-check chk" style="visibility:' + (currentModel ? 'hidden' : 'visible') + '"></i>' +
+            '<span class="grow">Otomatis<small>Model default provider ini</small></span>';
+        auto.addEventListener('click', function () {
+            currentModel = null;
+            saveModelChoice();
+            updateModelName();
+            modelMenu.classList.remove('open');
+            renderModelMenu();
+        });
+        modelMenu.appendChild(auto);
+
+        var cache = modelCache[currentProvider];
+        var models = cache && cache.ok ? (cache.models || []) : [];
+        if (!models.length) {
+            var empty = document.createElement('p');
+            empty.className = 'cp-model-empty';
+            empty.textContent = cache && cache.error ? '✗ ' + cache.error : 'Memuat daftar model…';
+            modelMenu.appendChild(empty);
+            return;
+        }
+        models.forEach(function (m) {
+            var t = m.tier || 'unknown';
+            var row = document.createElement('button');
+            row.type = 'button';
+            row.className = 'cp-prov-item';
+            if (m.note) row.title = m.note;
+            row.innerHTML =
+                '<i class="fa-solid fa-check chk" style="visibility:' + (m.id === currentModel ? 'visible' : 'hidden') + '"></i>' +
+                '<span class="grow">' + esc(shortModel(m.id)) +
+                '<small>' + esc(m.name || '') +
+                (m.price ? ' · $' + m.price.input + ' / $' + m.price.output + ' per 1jt token' : '') +
+                '</small></span>' +
+                '<span class="badge ' + (t === 'free' ? 'badge-free' : (t === 'paid' ? 'badge-paid' : 'badge-unknown')) + '">' +
+                (t === 'free' ? 'GRATIS' : (t === 'paid' ? 'BERBAYAR' : '?')) + '</span>';
+            row.addEventListener('click', function () {
+                currentModel = m.id;
+                saveModelChoice();
+                updateModelName();
+                modelMenu.classList.remove('open');
+                renderModelMenu();
+                kuroToast('Model aktif: ' + shortModel(m.id), 'ok');
+            });
+            modelMenu.appendChild(row);
+        });
+    }
+
+    function loadProviderModels(slug, force) {
+        if (!slug) return;
+        updateModelName();
+        if (!force && modelCache[slug] && modelCache[slug].ok) {
+            renderModelMenu();
+            return;
+        }
+        modelCache[slug] = { ok: false, models: [], error: null };
+        renderModelMenu();
+        fetch('/api/ai/models/' + encodeURIComponent(slug), { headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (currentProvider !== slug) return; // provider sudah diganti di tengah jalan
+                modelCache[slug] = data && data.ok
+                    ? data
+                    : { ok: false, models: [], error: (data && data.error) || 'Gagal memuat daftar model.' };
+                // Pilihan tersimpan tidak ada di daftar model provider ini -> pakai default.
+                if (currentModel) {
+                    var found = (modelCache[slug].models || []).some(function (m) { return m.id === currentModel; });
+                    if (!found) { currentModel = null; saveModelChoice(); }
+                }
+                updateModelName();
+                renderModelMenu();
+            })
+            .catch(function () {
+                if (currentProvider !== slug) return;
+                modelCache[slug] = { ok: false, models: [], error: 'Gagal menghubungi server.' };
+                renderModelMenu();
+            });
+    }
+
+    if (modelBtn) {
+        modelBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            modelMenu.classList.toggle('open');
+            renderModelMenu();
+        });
+    }
+    document.addEventListener('click', function (e) {
+        if (modelMenu && !modelMenu.contains(e.target) && modelBtn && !modelBtn.contains(e.target)) {
+            modelMenu.classList.remove('open');
+        }
+    });
+
     // ---------- Chat ----------
     var history = [];
 
@@ -446,6 +580,7 @@
             body: JSON.stringify({
                 message: text,
                 provider: currentProvider,
+                model: currentModel, // model dari dropdown model (null = default provider)
                 history: history.slice(0, -1).slice(-20)
             })
         }).then(function (r) { return r.json(); }).then(function (data) {

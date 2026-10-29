@@ -393,3 +393,13 @@ label{display:block;margin:12px 0 6px;font-size:.78rem;color:var(--muted);font-w
 .msg-media{max-width:100%;max-height:340px;border-radius:12px;display:block}
 .msg video.msg-media{width:100%;max-height:400px}
 
+
+
+/* ===== Dropdown model di composer (sebelah dropdown provider) ===== */
+.cp-model{position:relative}
+.cp-model .cp-prov-btn span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px}
+.cp-model-menu{min-width:300px;max-height:330px;overflow-y:auto}
+.cp-model-head{font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--muted);padding:7px 12px 5px}
+.cp-model-empty{color:var(--muted);font-size:.78rem;text-align:center;padding:12px 8px;margin:0}
+.cp-prov-item .badge{flex:none}
