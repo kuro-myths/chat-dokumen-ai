@@ -14,8 +14,8 @@ Integrasi AI cukup **2 driver**:
 | 🧠 **Cek model** | Tombol **Lihat Model** di beranda & `GET /api/ai/models` menampilkan daftar model tiap provider (Gemini `models/`, openai-compatible `/models`) |
 | 📄 **Periksa dokumen** | Unggah `.docx` dari beranda (drag & drop) → AI menganalisis bahasa, sitasi, metodologi, struktur BAB I–V → highlight warna + komentar + unduh DOCX berwarna + laporan review |
 | 💬 **Riwayat percakapan** | Ikon 💾 menyimpan percakapan, tombol **Riwayat tersimpan** membuka riwayat (muat/hapus) — tersimpan di browser; percakapan aktif auto-restore |
-| 🐾 **Maskot Kuro** | Kucing Kuro melayang (animasi CSS) — berkedip & memunculkan cincin scan saat menganalisis ("Kuro sedang menganalisis…") |
-| 🔐 **Halaman masuk + beranda** | Welcome default Laravel **diganti**: `/login` password default **123456789** (ubah via `APP_LOGIN_PASSWORD`), `/` beranda terang ala Gemini — sidebar ungu muda + konten putih (font Plus Jakarta Sans via CDN, favicon bubble-K ungu) |
+| 🐾 **Maskot Kuro** | Kucing Kuro melayang (SVG eksternal + animasi) — berkedip & memunculkan cincin scan saat menganalisis ("Kuro sedang menganalisis…") |
+| 🔐 **Halaman masuk + beranda** | Welcome default Laravel **diganti**: `/login` password default **123456789** (ubah via `APP_LOGIN_PASSWORD`), `/` beranda terang ala Gemini — sidebar ungu muda + konten putih (Plus Jakarta Sans & Font Awesome via CDN, favicon bubble-K di `public/img/`) |
 | DOCX | Parse per paragraf (deteksi BAB/sub-bab) → ekspor `.docx` dengan warna highlight + lampiran Laporan Review AI (phpoffice/phpword) |
 | Tanda warna | merah = bahasa/typo/plagiarisme, kuning = tanpa sitasi, biru = metodologi, ungu = struktur, hijau = gaya akademik |
 | Perbaikan revisi | `POST /highlights/{id}/accept` mengganti teks asli dengan `replacement`, snapshot versi otomatis, plus `accept-all` |
@@ -90,7 +90,7 @@ composer install          # generate vendor/ (laravel/framework, phpword, guzzle
 composer dump-autoload    # regenerate autoload untuk class di app/Services
 ```
 
-> Catatan: repo ini berisi file tambahan di atas kerangka Laravel standar. Jika kamu mulai dari `laravel new` (Cara A di atas), salin folder `app/`, `config/`, `database/migrations/`, `routes/`, `resources/` ke path yang sama, lalu jalankan `composer dump-autoload`. `routes/web.php` repo ini menimpa route welcome bawaan Laravel.
+> Catatan: repo ini berisi file tambahan di atas kerangka Laravel standar. Jika kamu mulai dari `laravel new` (Cara A di atas), salin folder `app/`, `config/`, `database/migrations/`, `public/`, `routes/`, `resources/` ke path yang sama, lalu jalankan `composer dump-autoload`. `routes/web.php` repo ini menimpa route welcome bawaan Laravel.
 
 Daftarkan provider di `bootstrap/providers.php`:
 
@@ -133,6 +133,7 @@ Minimal isi `GEMINI_API_KEY` di `.env`, atau isi `NINEROUTER_BASE_URL` + `NINERO
 | Halaman `/` masih tampil welcome Laravel | pastikan `routes/web.php` dari repo ini yang terpasang (welcome route bawaan tertimpa) |
 | Tombol "Lihat Model" error `Provider belum dikonfigurasi` | API key / base URL provider kosong — isi di `.env` atau tambahkan via form di beranda |
 | Dikte suara tidak jalan | Gunakan Chrome/Edge terbaru (fitur Speech Recognition) dan izinkan akses mikrofon |
+| Ikon tidak muncul | Pastikan koneksi internet aktif (Font Awesome & Google Fonts dimuat via CDN) atau ganti ke CDN alternatif |
 
 ## Struktur file tambahan
 
@@ -163,7 +164,11 @@ app/Http/Requests/                # validasi upload
 app/Jobs/RunThesisReview.php
 app/Models/                       # Document, DocumentSection, DocumentVersion, Comment, Highlight, Transcription, AiSetting
 database/migrations/2026_10_28_000001_create_skripsi_ai_tables.php
-resources/views/                  # layouts/app (tema terang ala Gemini + favicon bubble-K), login, beranda
+resources/views/                   # layouts/app (CDN: Font Awesome + Google Fonts), login, beranda
+public/css/kuro.css                # stylesheet Kuro AI (eksternal, tanpa style inline)
+public/js/kuro.js                  # logika beranda (eksternal, tanpa script inline)
+public/img/kuro.svg                # maskot Kuro (SVG + animasi SMIL)
+public/img/kuro-logo.svg           # logo & favicon bubble-K
 routes/api.php
 resources/js/voice-input.js        # auto-stop silence detection + auto insert
 ```
@@ -247,4 +252,5 @@ Ai::extend('providerku', function (string $name, array $config) {
 - Voice memakai endpoint kompatibel Whisper (`/audio/transcriptions`); bisa diarahkan ke Groq (whisper-large-v3) atau server lokal whisper.cpp via `VOICE_BASE_URL`. Dikte di beranda memakai Speech Recognition bawaan browser (Chrome/Edge).
 - Riwayat percakapan tersimpan di localStorage browser; percakapan aktif otomatis dipulihkan saat halaman dibuka lagi.
 - Halaman web memakai sesi Laravel — pastikan `SESSION_DRIVER` aktif (default `database`/`file` sudah cukup).
-- Favicon berupa bubble-K (ikon percakapan) disematkan sebagai SVG inline di `resources/views/layouts/app.blade.php`.
+- Front-end **tanpa kode inline**: CSS di `public/css/kuro.css`, JS di `public/js/kuro.js`, ikon via **Font Awesome CDN**, font via **Google Fonts CDN**. Class custom memakai prefiks sendiri (`kuro-`, `side-`, `q-`, `prov-`, `doc-`, `hl-`, `hist-`, `chat-`, `login-`) sehingga tidak bentrok dengan library CDN (`fa-*`).
+- Favicon berupa file `public/img/kuro-logo.svg` (bubble-K) — bukan lagi SVG inline.
