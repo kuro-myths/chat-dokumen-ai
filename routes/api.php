@@ -49,6 +49,7 @@ Route::get('ai/models/{slug}', [ModelController::class, 'show']);
 // disimpan di ai_settings, "mode" menentukan yang aktif (is_default).
 Route::get('ai/setup', [AiSetupController::class, 'show']);
 Route::post('ai/setup', [AiSetupController::class, 'store']);
+Route::post('ai/setup/test-gemini', [AiSetupController::class, 'testGemini']);
 
 // ---------- Sinkron Max Router (online: Railway / offline: localhost) ----------
 Route::get('ai/router/status', [RouterSyncController::class, 'status']);

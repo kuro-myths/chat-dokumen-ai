@@ -1034,8 +1034,7 @@
         }).catch(function (e) { msg.textContent = '✗ ' + e.message; });
     });
 
-    document.getElementById('btn-setup-save').addEventListener('click', function () {
-        var msg = document.getElementById('setup-msg');
+    function postSetup() {
         var body = {
             mode: document.getElementById('sync-mode').value,
             gemini_api_key: document.getElementById('gemini-key').value.trim() || null,
@@ -1044,11 +1043,16 @@
             manual_api_key: document.getElementById('manual-key').value.trim() || null,
             manual_model: document.getElementById('manual-model').value.trim() || null
         };
-        fetch('/api/ai/setup', {
+        return fetch('/api/ai/setup', {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF},
             body: JSON.stringify(body)
-        }).then(function (r) { return r.json(); }).then(function (data) {
+        }).then(function (r) { return r.json(); });
+    }
+
+    document.getElementById('btn-setup-save').addEventListener('click', function () {
+        var msg = document.getElementById('setup-msg');
+        postSetup().then(function (data) {
             if (data.ok) {
                 msg.textContent = '✔ ' + data.message;
                 document.getElementById('gemini-key').value = '';
@@ -1059,6 +1063,33 @@
                 kuroThinking(false, 'Mode AI tersimpan ✨');
             } else {
                 msg.textContent = '✗ ' + (data.message || 'Gagal menyimpan setup.');
+            }
+        }).catch(function (e) { msg.textContent = '✗ ' + e.message; });
+    });
+
+    // ---------- Tes key Gemini langsung ke Google (simpan otomatis bila valid) ----------
+    document.getElementById('btn-test-gemini').addEventListener('click', function () {
+        var msg = document.getElementById('test-gemini-msg');
+        var keyInput = document.getElementById('gemini-key');
+        var key = keyInput.value.trim();
+        if (!key) {
+            msg.textContent = 'Tempel key kamu di kolom API Key Gemini dulu — lalu tekan tombol ini.';
+            return;
+        }
+        msg.textContent = 'Menguji key ke Google…';
+        fetch('/api/ai/setup/test-gemini', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF},
+            body: JSON.stringify({api_key: key})
+        }).then(function (r) { return r.json(); }).then(function (data) {
+            if (data.ok) {
+                msg.textContent = '✔ ' + data.message;
+                keyInput.value = '';
+                document.getElementById('setup-msg').textContent = 'Key Gemini sudah tersimpan & teruji ✅';
+                currentProvider = 'gemini';
+                loadProviders();
+            } else {
+                msg.textContent = '✗ ' + (data.message || 'Key ditolak Google — salin ulang penuh dari aistudio.google.com/api-keys.');
             }
         }).catch(function (e) { msg.textContent = '✗ ' + e.message; });
     });
@@ -1096,19 +1127,36 @@
 
     document.getElementById('btn-model-list').addEventListener('click', function () {
         var count = document.getElementById('model-count');
-        count.textContent = 'Memuat model…';
+        var key = document.getElementById('gemini-key').value.trim();
         var slug = document.getElementById('sync-mode').value === 'gemini' ? 'gemini' : 'manual';
-        fetch('/api/ai/models/' + slug, {headers: {'Accept': 'application/json'}})
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
-                if (data.ok) {
-                    renderModelList(data.models);
-                    if (data.pricing_source) count.title = 'Sumber label: ' + data.pricing_source;
-                } else {
-                    count.textContent = '✗ ' + (data.error || 'Gagal memuat daftar model.');
+        count.textContent = 'Memuat model…';
+
+        function go() {
+            fetch('/api/ai/models/' + slug, {headers: {'Accept': 'application/json'}})
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data.ok) {
+                        renderModelList(data.models);
+                        if (data.pricing_source) count.title = 'Sumber label: ' + data.pricing_source;
+                    } else {
+                        count.textContent = '✗ ' + (data.error || 'Gagal memuat daftar model.');
+                    }
+                })
+                .catch(function (e) { count.textContent = '✗ ' + e.message; });
+        }
+
+        // Mode Gemini + kolom key terisi → simpan dulu supaya tidak "belum dikonfigurasi".
+        if (slug === 'gemini' && key) {
+            postSetup().then(function (d) {
+                if (d.ok) {
+                    document.getElementById('gemini-key').value = '';
+                    loadProviders();
                 }
-            })
-            .catch(function (e) { count.textContent = '✗ ' + e.message; });
+                go();
+            }).catch(function () { go(); });
+        } else {
+            go();
+        }
     });
 
     // ---------- Init ----------

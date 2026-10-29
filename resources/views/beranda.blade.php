@@ -193,6 +193,8 @@
                 Dua dropdown berdampingan tanpa bentrok: <b>Gemini</b> (Google AI Studio)
                 dan <b>Manual</b> (Max Router / API kompatibel OpenAI — online di Railway
                 maupun lokal <code>localhost:3001</code>). Mode menentukan yang aktif.
+                <br><b>Mode Gemini tidak butuh router</b> — pesan error router bisa diabaikan
+                kalau kamu memakai Gemini.
             </p>
 
             {{-- Dropdown 1: Mode AI --}}
@@ -213,6 +215,10 @@
                     <a href="https://aistudio.google.com/api-keys" target="_blank" rel="noopener">aistudio.google.com/api-keys</a>.
                     Format lama <code>AIza...</code> maupun format baru <code>AQ.Ab8...</code> keduanya valid — salin penuh, jangan terpotong.
                 </p>
+                <button class="btn ghost" id="btn-test-gemini" type="button" style="width:100%;justify-content:center;margin-top:8px">
+                    <i class="fa-solid fa-plug-circle-check"></i> Tes &amp; Simpan Key Gemini
+                </button>
+                <p class="hint" id="test-gemini-msg"></p>
             </div>
 
             {{-- Panel Manual --}}
@@ -286,6 +292,6 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('js/kuro.js') }}"></script>
+<script src="{{ asset('js/kuro.js') }}?v=20261029-2"></script>
 @endpush
 
