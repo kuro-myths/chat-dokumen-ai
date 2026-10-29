@@ -207,7 +207,6 @@
         var f = e.target;
         var msg = document.getElementById('provider-msg');
         var body = {
-            slug: f.slug.value.trim(),
             name: f.name.value.trim(),
             driver: f.driver.value,
             base_url: f.base_url.value.trim() || null,
@@ -826,6 +825,7 @@
             if (data.ok) {
                 msg.textContent = '✔ ' + data.message;
                 if (data.base_url) document.getElementById('manual-base').value = data.base_url;
+                renderModelList(data.models);
                 loadProviders();
                 loadRouterStatus();
                 kuroThinking(false, 'Router tersinkron ✨');
@@ -862,6 +862,66 @@
                 msg.textContent = '✗ ' + (data.message || 'Gagal menyimpan setup.');
             }
         }).catch(function (e) { msg.textContent = '✗ ' + e.message; });
+    });
+
+    // ---------- Daftar model: gratis / berbayar ----------
+    function renderModelList(models) {
+        var list = document.getElementById('model-list');
+        var count = document.getElementById('model-count');
+        list.style.display = 'block';
+        list.innerHTML = '';
+        var free = 0, paid = 0, unknown = 0;
+        (models || []).forEach(function (m) {
+            var tier = m.tier || 'unknown';
+            if (tier === 'free') free++; else if (tier === 'paid') paid++; else unknown++;
+            var row = document.createElement('div');
+            row.className = 'model-item';
+            var badge = document.createElement('span');
+            badge.className = tier === 'free' ? 'badge-free' : (tier === 'paid' ? 'badge-paid' : 'badge-unknown');
+            badge.textContent = tier === 'free' ? 'GRATIS' : (tier === 'paid' ? 'BERBAYAR' : '?');
+            var code = document.createElement('code');
+            code.textContent = m.id;
+            row.appendChild(badge);
+            row.appendChild(code);
+            if (m.price) {
+                var price = document.createElement('span');
+                price.className = 'model-price';
+                price.textContent = '
+    loadProviders();
+    loadDocs();
+    renderChat();
+    restoreCurrent();
+})();
+ + m.price.input + ' / 
+    loadProviders();
+    loadDocs();
+    renderChat();
+    restoreCurrent();
+})();
+ + m.price.output + ' per 1jt token';
+                row.appendChild(price);
+            }
+            if (m.note) row.title = m.note;
+            list.appendChild(row);
+        });
+        count.textContent = '🟢 ' + free + ' gratis • 🔴 ' + paid + ' berbayar' + (unknown ? ' • ⚪ ' + unknown + ' belum diketahui' : '');
+    }
+
+    document.getElementById('btn-model-list').addEventListener('click', function () {
+        var count = document.getElementById('model-count');
+        count.textContent = 'Memuat model…';
+        var slug = document.getElementById('sync-mode').value === 'gemini' ? 'gemini' : 'manual';
+        fetch('/api/ai/models/' + slug, {headers: {'Accept': 'application/json'}})
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.ok) {
+                    renderModelList(data.models);
+                    if (data.pricing_source) count.title = 'Sumber label: ' + data.pricing_source;
+                } else {
+                    count.textContent = '✗ ' + (data.error || 'Gagal memuat daftar model.');
+                }
+            })
+            .catch(function (e) { count.textContent = '✗ ' + e.message; });
     });
 
     // ---------- Init ----------

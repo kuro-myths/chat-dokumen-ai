@@ -16,7 +16,8 @@ use Throwable;
  *
  * probe()  : cek /api/health tiap kandidat (tanpa API key).
  * sync()   : pilih router aktif (online duluan, gagal → lokal),
- *            tarik /v1/models, daftarkan aplikasi ini ke router
+ *            tarik /v1/models (sekalian label gratis/berbayar dari
+ *            data harga router), daftarkan aplikasi ini ke router
  *            (POST /api/dokumen-ai/sync), lalu perbarui provider
  *            "manual" agar chat/review AI tetap jalan dengan base URL
  *            yang sedang aktif — otomatis, online maupun offline.
@@ -146,7 +147,7 @@ class MaxRouterService
     /**
      * Sinkron penuh dengan Max Router (dipanggil POST /api/ai/router/sync):
      * 1. pilih scope (prefer user: online/local; auto = online duluan);
-     * 2. tarik daftar model /v1/models;
+     * 2. tarik daftar model /v1/models + label gratis/berbayar;
      * 3. daftarkan aplikasi ini ke router (POST /api/dokumen-ai/sync);
      * 4. perbarui provider "manual" di tabel ai_settings.
      *
@@ -187,9 +188,24 @@ class MaxRouterService
             $response = $request->get($baseUrl.'/models');
             $response->throw();
 
+            // Label gratis/berbayar dari data harga router (GET /api/pricing).
+            $pricingMap = app(ModelPricing::class)->routerPricing($baseUrl, $apiKey);
+
             $models = collect($response->json('data', []))
                 ->map(fn ($m) => ['id' => $m['id'] ?? ($m['name'] ?? null)])
                 ->filter(fn ($m) => filled($m['id']))
+                ->map(function ($m) use ($pricingMap) {
+                    $p = $pricingMap[strtolower((string) $m['id'])] ?? null;
+
+                    if ($p === null) {
+                        return $m + ['tier' => 'unknown'];
+                    }
+
+                    return $m + [
+                        'tier' => $p['tier'],
+                        'price' => ['input' => $p['input'], 'output' => $p['output']],
+                    ];
+                })
                 ->values()
                 ->all();
         } catch (Throwable $e) {

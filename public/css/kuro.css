@@ -312,3 +312,14 @@ label{display:block;margin:12px 0 6px;font-size:.78rem;color:var(--muted);font-w
 .prov-dot,.sync-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#d93025;flex:none;margin-right:4px;vertical-align:middle}
 .prov-dot.on,.sync-dot.on{background:#188038}
 .prov-dot.off,.sync-dot.off{background:#d93025}
+
+
+/* ===== Daftar model: gratis / berbayar ===== */
+.model-list{max-height:230px;overflow:auto;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:8px;margin-top:6px;background:rgba(0,0,0,.18);display:none}
+.model-item{display:flex;align-items:center;gap:8px;padding:4px 6px;font-size:12.5px}
+.model-item code{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.model-price{font-size:11px;opacity:.75;flex:none}
+.badge-free,.badge-paid,.badge-unknown{flex:none;font-size:10px;font-weight:700;letter-spacing:.4px;padding:2px 7px;border-radius:99px}
+.badge-free{background:rgba(24,128,56,.18);color:#81c995;border:1px solid rgba(24,128,56,.5)}
+.badge-paid{background:rgba(217,48,37,.15);color:#f28b82;border:1px solid rgba(217,48,37,.5)}
+.badge-unknown{background:rgba(255,255,255,.08);color:#9aa0a6;border:1px solid rgba(255,255,255,.2)}

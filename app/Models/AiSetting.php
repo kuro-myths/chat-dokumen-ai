@@ -2,11 +2,15 @@
 
 namespace App\Models;
 
+use App\Casts\SafeEncrypted;
 use Illuminate\Database\Eloquent\Model;
 
 /**
  * Provider AI yang ditambahkan user lewat API — kunci integrasi
  * "API apa pun": cukup slug + driver + base_url + model + api_key.
+ *
+ * Slug dibuat OTOMATIS dari nama (field slug di UI sudah dihapus),
+ * jadi user cukup isi nama + driver + API key.
  */
 class AiSetting extends Model
 {
@@ -15,7 +19,8 @@ class AiSetting extends Model
     ];
 
     protected $casts = [
-        'api_key' => 'encrypted',
+        // Encrypted kalau APP_KEY ada; plain (bukan error 500) kalau belum.
+        'api_key' => SafeEncrypted::class,
         'is_active' => 'boolean',
         'is_default' => 'boolean',
     ];

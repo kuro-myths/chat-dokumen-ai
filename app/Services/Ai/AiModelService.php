@@ -7,9 +7,10 @@ use Illuminate\Support\Facades\Http;
 use Throwable;
 
 /**
- * Daftar model AI yang tersedia di tiap provider.
- * Driver gemini -> Google AI Studio; driver openai-compatible (9Router,
- * OpenRouter, DeepSeek, dll.) -> endpoint /models.
+ * Daftar model AI yang tersedia di tiap provider — sekalian LABEL
+ * GRATIS / BERBAYAR per model (lihat ModelPricing).
+ * Driver gemini -> Google AI Studio; driver openai-compatible
+ * (Max Router, OpenRouter, DeepSeek, dll.) -> endpoint /models.
  */
 class AiModelService
 {
@@ -78,9 +79,10 @@ class AiModelService
     }
 
     /**
-     * Ambil daftar model satu provider dari API-nya.
+     * Ambil daftar model satu provider dari API-nya, lengkap dengan
+     * tier gratis/berbayar per model.
      *
-     * @return array{ok: bool, models: list<array{id: string, name: ?string}>, error: ?string}
+     * @return array{ok: bool, models: list<array{id: string, name: ?string, tier: string, note?: string, price?: array{input: float, output: float}}>, error: ?string, pricing_source?: string}
      */
     public function models(string $slug): array
     {
@@ -94,25 +96,64 @@ class AiModelService
             return [
                 'ok' => false,
                 'models' => [],
-                'error' => 'Provider belum dikonfigurasi (API key / base URL masih kosong di .env).',
+                'error' => 'Provider belum dikonfigurasi (API key / base URL masih kosong).',
             ];
         }
+
+        $pricing = app(ModelPricing::class);
 
         try {
             $driver = $config['driver'] ?? 'openai-compatible';
 
-            $models = match ($driver) {
-                'gemini' => $this->geminiModels($config['api_key'] ?? ''),
-                default => $this->openAiModels(
-                    $config['base_url'] ?? 'https://api.openai.com/v1',
-                    $config['api_key'] ?? '',
-                ),
-            };
+            if ($driver === 'gemini') {
+                $raw = $this->geminiModels($config['api_key'] ?? '');
+
+                $models = collect($raw)
+                    ->map(fn ($m) => $m + $pricing->gemini((string) $m['id']))
+                    ->values()
+                    ->all();
+
+                return ['ok' => true, 'models' => $models, 'error' => null, 'pricing_source' => 'katalog AI Studio'];
+            }
+
+            $raw = $this->openAiModels(
+                $config['base_url'] ?? 'https://api.openai.com/v1',
+                $config['api_key'] ?? '',
+            );
+
+            // Harga asli dari router (Max Router punya GET /api/pricing).
+            $routerPricing = $pricing->routerPricing($config['base_url'] ?? null, $config['api_key'] ?? null);
+
+            $models = collect($raw)
+                ->map(function ($m) use ($pricing, $routerPricing) {
+                    $p = $routerPricing[strtolower((string) $m['id'])] ?? null;
+
+                    if ($p !== null) {
+                        return [
+                            'id' => $m['id'],
+                            'name' => $m['name'],
+                            'tier' => $p['tier'],
+                            'price' => ['input' => $p['input'], 'output' => $p['output']],
+                            'note' => $p['tier'] === 'free'
+                                ? 'Gratis menurut data harga router (input/output = 0).'
+                                : 'Berbayar — $'.$p['input'].' input / $'.$p['output'].' output per 1 juta token.',
+                        ];
+                    }
+
+                    return $m + $pricing->heuristic((string) $m['id']);
+                })
+                ->values()
+                ->all();
+
+            return [
+                'ok' => true,
+                'models' => $models,
+                'error' => null,
+                'pricing_source' => $routerPricing !== null ? 'data harga router' : 'heuristik nama model',
+            ];
         } catch (Throwable $e) {
             return ['ok' => false, 'models' => [], 'error' => $e->getMessage()];
         }
-
-        return ['ok' => true, 'models' => $models, 'error' => null];
     }
 
     /** @return ?array{driver: string, api_key: ?string, base_url: ?string, model: ?string} */
@@ -144,12 +185,13 @@ class AiModelService
         };
     }
 
-    /** Gemini: GET /v1beta/models?key=... */
+    /** Gemini: GET /v1beta/models — key dikirim via header x-goog-api-key. */
     protected function geminiModels(string $apiKey): array
     {
         $response = Http::timeout(20)
             ->acceptJson()
-            ->get(self::GEMINI_BASE.'/models', ['key' => $apiKey, 'pageSize' => 200]);
+            ->withHeaders(['x-goog-api-key' => $apiKey])
+            ->get(self::GEMINI_BASE.'/models', ['pageSize' => 200]);
 
         $response->throw();
 
@@ -163,7 +205,7 @@ class AiModelService
             ->all();
     }
 
-    /** Multi-API (9Router, OpenRouter, DeepSeek, dll.): GET {base}/models */
+    /** Multi-API (Max Router, OpenRouter, DeepSeek, dll.): GET {base}/models */
     protected function openAiModels(string $baseUrl, string $apiKey): array
     {
         $response = Http::withToken($apiKey)

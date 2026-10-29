@@ -150,13 +150,11 @@
                 Contoh 9Router online: driver <b>openai-compatible</b>,
                 base URL <code>https://instance-9router-kamu.up.railway.app/v1</code>,
                 API key dari dashboard 9Router, model bebas (mis. <code>gpt-4o-mini</code>).
-                Untuk Gemini cukup isi slug, nama, driver <code>gemini</code>, dan API key.
+                Untuk Gemini cukup isi nama, driver <code>gemini</code>, dan API key — slug dibuat otomatis dari nama.
             </p>
             <form id="provider-form">
-                <div class="prow">
-                    <div><label>Slug</label><input name="slug" placeholder="gemini-2 / 9router" pattern="[A-Za-z0-9_-]+" required></div>
-                    <div><label>Nama</label><input name="name" placeholder="9Router Online" required></div>
-                </div>
+                <label>Nama</label>
+                <input name="name" placeholder="9Router Online / Gemini" required>
                 <div class="prow">
                     <div>
                         <label>Driver</label>
@@ -170,7 +168,7 @@
                 <label>Base URL (khusus openai-compatible)</label>
                 <input name="base_url" placeholder="https://instance-9router-kamu.up.railway.app/v1">
                 <label>API Key</label>
-                <input name="api_key" placeholder="sk-... / AIza...">
+                <input name="api_key" placeholder="sk-... / AIza... / AQ.Ab8...">
                 <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="is_default" style="width:auto"> Jadikan provider default</label>
                 <button type="submit" class="btn" style="width:100%;justify-content:center;margin-top:10px"><i class="fa-solid fa-floppy-disk"></i> Simpan Provider</button>
                 <p id="provider-msg" class="hint"></p>
@@ -203,12 +201,13 @@
             {{-- Panel Gemini --}}
             <div id="sync-gemini" class="sync-panel">
                 <label>API Key Gemini</label>
-                <input id="gemini-key" placeholder="AIza... (kosongkan = pakai yang tersimpan / .env)" autocomplete="off">
+                <input id="gemini-key" placeholder="AIza... / AQ.Ab8... — keduanya valid (kosongkan = pakai yang tersimpan)" autocomplete="off">
                 <label>Model Gemini</label>
-                <input id="gemini-model" placeholder="gemini-2.0-flash">
+                <input id="gemini-model" placeholder="gemini-2.5-flash">
                 <p class="hint">
                     API key gratis di
                     <a href="https://aistudio.google.com/api-keys" target="_blank" rel="noopener">aistudio.google.com/api-keys</a>.
+                    Format lama <code>AIza...</code> maupun format baru <code>AQ.Ab8...</code> keduanya valid — salin penuh, jangan terpotong.
                 </p>
             </div>
 
@@ -237,6 +236,13 @@
                 <span class="sync-dot" id="dot-local"></span> Lokal (localhost:3001): <b id="st-local">?</b>
             </p>
             <p class="hint" id="sync-msg"></p>
+
+            <label style="margin-top:14px">Daftar Model — mana yang gratis / berbayar</label>
+            <button class="btn ghost" id="btn-model-list" type="button" style="width:100%;justify-content:center">
+                <i class="fa-solid fa-list"></i> Tampilkan Daftar Model
+            </button>
+            <p class="hint" id="model-count"></p>
+            <div class="model-list" id="model-list"></div>
 
             <button class="btn" id="btn-setup-save" style="width:100%;justify-content:center;margin-top:10px" type="button">
                 <i class="fa-solid fa-floppy-disk"></i> Simpan Mode &amp; API Key

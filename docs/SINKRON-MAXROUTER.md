@@ -11,20 +11,49 @@ integrasi AI berlaku **online** (router di Railway) maupun **offline/lokal**
 | `GET /api/ai/setup` | Setup saat ini: mode aktif, status key Gemini & Manual |
 | `POST /api/ai/setup` | Simpan mode (`gemini`/`manual`) + API key / base URL / model |
 | `GET /api/ai/router/status` | Probe router **online** & **lokal** (`/api/health` + latensi) |
-| `POST /api/ai/router/sync` | Sinkron: tarik `/v1/models`, daftar konsumen ke router, perbarui provider `manual` |
+| `POST /api/ai/router/sync` | Sinkron: tarik `/v1/models` + label gratis/berbayar, daftar konsumen ke router, perbarui provider `manual` |
+| `GET /api/ai/models/{slug}` | Daftar model satu provider **lengkap dengan label GRATIS / BERBAYAR** |
 
 Router menyediakan pasangannya (repo max-router, folder `backend/src/routes/dokumen-ai/`):
 `GET /api/dokumen-ai/status` dan `POST /api/dokumen-ai/sync`.
 
+## API key Gemini — format lama & baru
+
+AI Studio kini menerbitkan key format baru **`AQ.Ab8...`** menggantikan
+`AIza...` (AIza lama dideprekasi bertahap dan berhenti September 2026).
+**Keduanya didukung** oleh aplikasi ini:
+
+- Key dikirim via header `x-goog-api-key` ke endpoint native
+  `generativelanguage.googleapis.com/v1beta` — satu-satunya jalur resmi
+  untuk key `AQ.Ab8...`.
+- Salin key **penuh** dari <https://aistudio.google.com/api-keys>
+  (jangan terpotong — key AQ. cukup panjang).
+- Model default kini `gemini-2.5-flash` (`gemini-2.0-flash` sudah pensiun).
+
 ## Dua dropdown tanpa bentrok
 
-- **Gemini** — API key gratis dari <https://aistudio.google.com/api-keys>.
+- **Gemini** — API key dari <https://aistudio.google.com/api-keys>
+  (format `AIza...` maupun `AQ.Ab8...`).
 - **Manual** — Max Router / API kompatibel OpenAI apa pun: pilih sumber
   **Online (Railway)** atau **Lokal (localhost:3001)**, isi base URL + API key + model.
 
 Keduanya disimpan di tabel `ai_settings` (slug `gemini` dan `manual`).
 Mode menentukan mana yang default — berganti mode tidak menghapus konfigurasi
-dropdown satunya, jadi tidak pernah bentrok.
+dropdown satunya. Tidak perlu isi **slug** lagi di form "Tambah API Key" —
+slug dibuat otomatis dari nama.
+
+## Daftar model: mana yang gratis, mana yang berbayar
+
+Di modal **Sinkron Router** ada tombol **"Tampilkan Daftar Model"**:
+
+- setiap model diberi badge **GRATIS** / **BERBAYAR** / **?** (belum diketahui);
+- Gemini: dari katalog free-tier AI Studio (flash/flash-lite gratis,
+  Pro & generasi 3.x berbayar);
+- Max Router & kompatibel OpenAI: dari data harga asli router
+  (`GET /api/pricing`, input/output per 1 juta token; 0-0 = gratis)
+  — kalau router tidak punya data harga, dipakai heuristik nama
+  (mis. suffix `:free` ala OpenRouter);
+- setelah sinkron, daftar model otomatis ikut diperbarui.
 
 ## Online ↔ offline otomatis
 
@@ -44,7 +73,11 @@ MAXROUTER_BASE_URL=http://localhost:3001/v1
 MAXROUTER_API_KEY=
 MAXROUTER_MODEL=gpt-4o-mini
 GEMINI_API_KEY=                               # dari aistudio.google.com/api-keys
+GEMINI_MODEL=gemini-2.5-flash
 ```
+
+Catatan: API key disimpan terenkripsi kalau `APP_KEY` tersedia; kalau belum,
+disimpan apa adanya (tidak lagi memicu "server error" 500).
 
 ## Jalan lokal (tanpa internet untuk Gemini tidak masalah — pakai router lokal)
 
@@ -54,6 +87,7 @@ cd max-router && npm install && npm run backend   # :3001
 
 # Terminal 2 — Kuro AI
 cp .env.example .env
+php artisan key:generate    # opsional tapi disarankan (enkripsi API key)
 php artisan migrate
 php artisan serve                                  # :8000
 ```
