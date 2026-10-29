@@ -66,22 +66,54 @@ class MaxRouterService
         return rtrim((string) preg_replace('#/(v\d+(beta)?)$#', '', $baseUrl), '/');
     }
 
-    /** Cek satu router: /api/health + latensi. */
+    /**
+     * Cek satu router: /api/health dulu, lalu fallback /models —
+     * router tanpa endpoint /api/health (mis. deploy Railway berbeda)
+     * tetap terdeteksi hidup, online maupun lokal.
+     */
     protected function check(string $baseUrl): array
     {
         $start = microtime(true);
 
+        // 1) Endpoint standar router: /api/health (tanpa API key).
         try {
             $response = Http::timeout($this->timeout())
                 ->acceptJson()
                 ->get($this->root($baseUrl).'/api/health');
 
+            if ($response->ok()) {
+                return [
+                    'base_url' => $baseUrl,
+                    'reachable' => true,
+                    'status' => $response->json('status') ?? 'ok',
+                    'version' => $response->json('version'),
+                    'latency_ms' => (int) round((microtime(true) - $start) * 1000),
+                ];
+            }
+        } catch (Throwable) {
+            // lanjut ke fallback di bawah
+        }
+
+        // 2) Fallback: GET {base}/models — respons HTTP apa pun berarti
+        //    router HIDUP (401/403 = hidup tapi perlu API key).
+        try {
+            $request = Http::timeout($this->timeout())->acceptJson();
+
+            $apiKey = $this->apiKey();
+
+            if ($apiKey !== '') {
+                $request = $request->withToken($apiKey);
+            }
+
+            $response = $request->get($baseUrl.'/models');
+
             return [
                 'base_url' => $baseUrl,
-                'reachable' => $response->ok(),
-                'status' => $response->json('status'),
+                'reachable' => true,
+                'status' => $response->ok() ? 'ok' : 'perlu API key',
                 'version' => $response->json('version'),
                 'latency_ms' => (int) round((microtime(true) - $start) * 1000),
+                'needs_key' => ! $response->ok(),
             ];
         } catch (Throwable) {
             return [
@@ -146,37 +178,65 @@ class MaxRouterService
 
     /**
      * Sinkron penuh dengan Max Router (dipanggil POST /api/ai/router/sync):
-     * 1. pilih scope (prefer user: online/local; auto = online duluan);
-     * 2. tarik daftar model /v1/models + label gratis/berbayar;
+     * 1. tentukan target — Base URL eksplisit dari UI MENANG; kalau kosong,
+     *    pilih scope (prefer user: online/local; auto = online duluan);
+     * 2. tarik daftar model {target}/models + label gratis/berbayar;
      * 3. daftarkan aplikasi ini ke router (POST /api/dokumen-ai/sync);
      * 4. perbarui provider "manual" di tabel ai_settings.
      *
+     * Base URL + API key bisa dikirim langsung dari form sinkron, jadi
+     * TIDAK bergantung pada MAXROUTER_ONLINE_URL di .env — jalan untuk
+     * router online (Railway) maupun lokal (localhost:3001).
+     *
+     * @param string $prefer  auto | online | local
+     * @param ?string $baseUrl base URL router dari UI (opsional)
+     * @param ?string $apiKey  API key router dari UI (opsional)
+     *
      * @return array{ok: bool, ...}
      */
-    public function sync(string $prefer = 'auto'): array
+    public function sync(string $prefer = 'auto', ?string $baseUrl = null, ?string $apiKey = null): array
     {
         $probe = $this->probe();
 
+        $target = null;
         $scope = null;
 
-        if (in_array($prefer, ['online', 'local'], true)
-            && ($probe[$prefer]['reachable'] ?? false) === true) {
-            $scope = $prefer;
+        // 1) Base URL eksplisit dari kolom di modal sinkron — pakai langsung.
+        if (filled($baseUrl)) {
+            $target = $this->normalize(trim((string) $baseUrl));
+            $scope = in_array($prefer, ['online', 'local'], true) ? $prefer : 'online';
         }
 
-        $scope ??= $probe['active_scope'];
+        // 2) Tanpa URL eksplisit: pilih dari kandidat (online duluan, fallback lokal).
+        if ($target === null) {
+            if (in_array($prefer, ['online', 'local'], true)
+                && ($probe[$prefer]['reachable'] ?? false) === true) {
+                $scope = $prefer;
+            }
 
-        if ($scope === null) {
+            $scope ??= $probe['active_scope'];
+
+            if ($scope !== null) {
+                $target = $probe[$scope]['base_url'];
+            }
+        }
+
+        if ($target === null) {
             return [
                 'ok' => false,
-                'error' => 'Max Router tidak dapat dijangkau. Cek MAXROUTER_ONLINE_URL di .env '
-                    .'atau pastikan router lokal berjalan (default http://localhost:3001).',
+                'error' => 'Max Router tidak dapat dijangkau. Isi kolom "Base URL" di panel Manual '
+                    .'(mis. https://max-router-kamu.up.railway.app/v1) lalu tekan "Sinkron Sekarang", '
+                    .'atau pastikan router lokal berjalan (default http://localhost:3001). '
+                    .'Alternatif: set MAXROUTER_ONLINE_URL di .env.',
                 'router' => $probe,
             ];
         }
 
-        $baseUrl = $probe[$scope]['base_url'];
-        $apiKey = $this->apiKey();
+        $apiKey = trim((string) ($apiKey ?? ''));
+
+        if ($apiKey === '') {
+            $apiKey = $this->apiKey();
+        }
 
         try {
             $request = Http::timeout(30)->acceptJson();
@@ -185,11 +245,11 @@ class MaxRouterService
                 $request = $request->withToken($apiKey);
             }
 
-            $response = $request->get($baseUrl.'/models');
+            $response = $request->get($target.'/models');
             $response->throw();
 
             // Label gratis/berbayar dari data harga router (GET /api/pricing).
-            $pricingMap = app(ModelPricing::class)->routerPricing($baseUrl, $apiKey);
+            $pricingMap = app(ModelPricing::class)->routerPricing($target, $apiKey);
 
             $models = collect($response->json('data', []))
                 ->map(fn ($m) => ['id' => $m['id'] ?? ($m['name'] ?? null)])
@@ -209,11 +269,18 @@ class MaxRouterService
                 ->values()
                 ->all();
         } catch (Throwable $e) {
+            $hint = '';
+
+            if (str_contains($e->getMessage(), '401') || str_contains($e->getMessage(), '403')) {
+                $hint = ' — router menolak akses: isi kolom "API Key Router" di panel Manual lalu sinkron lagi.';
+            }
+
             return [
                 'ok' => false,
-                'error' => 'Gagal menarik model dari Max Router: '.$e->getMessage(),
+                'error' => 'Gagal menarik model dari Max Router: '.$e->getMessage().$hint,
                 'router' => $probe,
                 'scope' => $scope,
+                'base_url' => $target,
             ];
         }
 
@@ -222,22 +289,22 @@ class MaxRouterService
         $this->cachePut('maxrouter.scope', $scope);
 
         // Daftarkan aplikasi ini sebagai konsumen router (sinkron dua arah).
-        $registry = $this->registerOnRouter($baseUrl, $apiKey);
+        $registry = $this->registerOnRouter($target, $apiKey);
 
         // Perbarui provider "manual" — AI jalan via router aktif (online/offline otomatis).
-        $this->applyToManual($baseUrl, $models, $apiKey);
+        $this->applyToManual($target, $models, $apiKey);
 
         return [
             'ok' => true,
             'scope' => $scope,
-            'base_url' => $baseUrl,
+            'base_url' => $target,
             'count' => count($models),
             'models' => array_slice($models, 0, 200),
             'registry' => $registry,
             'synced_at' => now()->toIso8601String(),
             'router' => $probe,
-            'message' => 'Sinkron berhasil via '.($scope === 'online' ? 'router ONLINE (Railway)' : 'router LOKAL')
-                .' — '.count($models).' model dari '.$baseUrl,
+            'message' => 'Sinkron berhasil dari '.$target.' — '.count($models).' model'
+                .($scope === 'local' ? ' (router LOKAL)' : ' (router ONLINE)'),
         ];
     }
 

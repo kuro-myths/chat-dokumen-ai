@@ -29,9 +29,15 @@ class RouterSyncController extends Controller
     {
         $data = $request->validate([
             'prefer' => ['nullable', 'in:auto,online,local'],
+            'base_url' => ['nullable', 'url', 'max:255'],
+            'api_key' => ['nullable', 'string', 'max:1024'],
         ]);
 
-        $result = $this->router->sync($data['prefer'] ?? 'auto');
+        $result = $this->router->sync(
+            $data['prefer'] ?? 'auto',
+            $data['base_url'] ?? null,
+            $data['api_key'] ?? null
+        );
 
         return response()->json($result, $result['ok'] ? 200 : 502);
     }

@@ -1304,15 +1304,23 @@
         var msg = document.getElementById('sync-msg');
         msg.textContent = 'Menyinkronkan…';
         var prefer = document.getElementById('manual-scope').value; // online | local
+        // Base URL + API key dikirim langsung — sinkron tidak lagi bergantung
+        // pada MAXROUTER_ONLINE_URL di .env. Berlaku utk online & lokal.
         fetch('/api/ai/router/sync', {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF},
-            body: JSON.stringify({prefer: prefer})
+            body: JSON.stringify({
+                prefer: prefer,
+                base_url: document.getElementById('manual-base').value.trim() || null,
+                api_key: document.getElementById('manual-key').value.trim() || null
+            })
         }).then(function (r) { return r.json(); }).then(function (data) {
             if (data.ok) {
                 msg.textContent = '✔ ' + data.message;
                 if (data.base_url) document.getElementById('manual-base').value = data.base_url;
                 renderModelList(data.models);
+                modelCache = {}; // paksa muat ulang daftar model di dropdown composer
+                loadProviderModels(currentProvider, true);
                 loadProviders();
                 loadRouterStatus();
                 kuroThinking(false, 'Router tersinkron ✨');
