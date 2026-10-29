@@ -8,6 +8,7 @@ use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 use Symfony\Component\HttpClient\HttpClient as SymfonyClient;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * Driver Google Gemini (Google AI Studio).
@@ -55,6 +56,16 @@ class GeminiDriver implements AiProviderInterface
             ->acceptJson()
             ->withHeaders(['x-goog-api-key' => (string) ($this->config['api_key'] ?? '')])
             ->post($this->url('generateContent', $options), $this->payload($messages, $options));
+
+        // Model tertentu (mis. keluarga Gemma) tidak mendukung systemInstruction
+        // -> HTTP 400 "Developer instruction is not enabled for this model".
+        // Ulangi sekali dengan system digabung ke pesan user pertama.
+        if ($response->status() === 400 && $this->systemNotSupported((string) $response->body())) {
+            $response = Http::timeout($options['timeout'] ?? 120)
+                ->acceptJson()
+                ->withHeaders(['x-goog-api-key' => (string) ($this->config['api_key'] ?? '')])
+                ->post($this->url('generateContent', $options), $this->payload($messages, $options + ['merge_system' => true]));
+        }
 
         $this->assertOk($response);
 
@@ -118,14 +129,7 @@ class GeminiDriver implements AiProviderInterface
     public function stream(array $messages, array $options = []): \Generator
     {
         $client = SymfonyClient::create(timeout: $options['timeout'] ?? 120);
-        $response = $client->request('POST', $this->url('streamGenerateContent', $options).'?alt=sse', [
-            'headers' => [
-                'x-goog-api-key' => (string) ($this->config['api_key'] ?? ''),
-                'Accept' => 'application/json',
-                'Content-Type' => 'application/json',
-            ],
-            'body' => json_encode($this->payload($messages, $options)),
-        ]);
+        $response = $this->streamRequest($client, $messages, $options);
 
         // Paksa header diterima supaya status HTTP bisa dicek sebelum streaming.
         try {
@@ -135,9 +139,24 @@ class GeminiDriver implements AiProviderInterface
         }
 
         $code = (int) ($response->getInfo('http_code') ?? 200);
+        $body = $code >= 400 ? $response->getContent(false) : '';
+
+        // Model tanpa systemInstruction (mis. Gemma) -> ulangi dengan
+        // system digabung ke pesan user pertama (lihat chat()).
+        if ($code === 400 && $this->systemNotSupported($body)) {
+            $response = $this->streamRequest($client, $messages, $options + ['merge_system' => true]);
+
+            try {
+                $response->getHeaders();
+            } catch (\Throwable $e) {
+                throw new RuntimeException('Gagal menghubungi Gemini: '.$e->getMessage());
+            }
+
+            $code = (int) ($response->getInfo('http_code') ?? 200);
+            $body = $code >= 400 ? $response->getContent(false) : '';
+        }
 
         if ($code >= 400) {
-            $body = $response->getContent(false);
             $message = (string) (json_decode($body, true)['error']['message'] ?? $body);
 
             throw new RuntimeException('Gemini streaming error HTTP '.$code.': '.mb_substr($message, 0, 300));
@@ -182,6 +201,18 @@ class GeminiDriver implements AiProviderInterface
             ->values()
             ->all();
 
+        // Fallback untuk model tanpa systemInstruction (mis. Gemma):
+        // system digabung ke pesan user pertama (opsi 'merge_system').
+        if ($system !== '' && ! empty($options['merge_system'])) {
+            if (isset($contents[0]) && $contents[0]['role'] === 'user') {
+                $contents[0]['parts'][0]['text'] = $system."\n\n".$contents[0]['parts'][0]['text'];
+            } else {
+                array_unshift($contents, ['role' => 'user', 'parts' => [['text' => $system]]]);
+            }
+
+            $system = '';
+        }
+
         $payload = [
             'contents' => $contents,
             'generationConfig' => ['temperature' => $options['temperature'] ?? 0.2],
@@ -192,5 +223,24 @@ class GeminiDriver implements AiProviderInterface
         }
 
         return $payload;
+    }
+
+    /** Request streaming SSE ke Gemini (dipakai juga untuk retry tanpa systemInstruction). */
+    protected function streamRequest(HttpClientInterface $client, array $messages, array $options)
+    {
+        return $client->request('POST', $this->url('streamGenerateContent', $options).'?alt=sse', [
+            'headers' => [
+                'x-goog-api-key' => (string) ($this->config['api_key'] ?? ''),
+                'Accept' => 'application/json',
+                'Content-Type' => 'application/json',
+            ],
+            'body' => json_encode($this->payload($messages, $options)),
+        ]);
+    }
+
+    /** True bila error Gemini karena model tidak mendukung systemInstruction. */
+    protected function systemNotSupported(string $body): bool
+    {
+        return str_contains($body, 'Developer instruction is not enabled');
     }
 }
