@@ -15,6 +15,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Mode AI — dua dropdown di beranda (tidak bentrok)
+    |--------------------------------------------------------------------------
+    | "gemini" -> pakai API key Google AI Studio (aistudio.google.com/api-keys).
+    | "manual" -> pakai Max Router / API kompatibel OpenAI (online / lokal).
+    | Mode juga tersimpan di tabel ai_settings (is_default), jadi nilai env
+    | ini hanya fallback awal sebelum user menyimpan setup pertama kali.
+    */
+
+    'mode' => env('AI_MODE', env('AI_PROVIDER', 'gemini')),
+
+    /*
+    |--------------------------------------------------------------------------
     | Halaman masuk (web)
     |--------------------------------------------------------------------------
     | Password untuk halaman /login. Default: 123456789.
@@ -53,6 +65,24 @@ return [
             'base_url' => env('CUSTOM_AI_BASE_URL'),
             'model' => env('CUSTOM_AI_MODEL'),
         ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Max Router (9Router V3) — sinkron ONLINE + OFFLINE
+    |--------------------------------------------------------------------------
+    | online_url : instance router yang di-deploy (Railway) — dicek duluan.
+    | local_url  : router lokal di komputer sendiri (fallback saat offline).
+    | Saat sync, provider "manual" otomatis memakai base URL router aktif,
+    | jadi chat/review AI tetap jalan baik online maupun lokal.
+    */
+
+    'router' => [
+        'online_url' => env('MAXROUTER_ONLINE_URL'),
+        'local_url' => env('MAXROUTER_BASE_URL', 'http://localhost:3001/v1'),
+        'api_key' => env('MAXROUTER_API_KEY'),
+        'model' => env('MAXROUTER_MODEL', 'gpt-4o-mini'),
+        'timeout' => 5,
     ],
 
     /*

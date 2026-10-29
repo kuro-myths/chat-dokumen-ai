@@ -34,6 +34,11 @@
                 <div class="api-drop-list" id="api-drop-list"><p class="muted">Memuat…</p></div>
                 <button class="btn small api-add" id="btn-add-provider"><i class="fa-solid fa-circle-plus"></i> Tambah API Key</button>
             </div>
+
+            {{-- Sinkron Max Router + mode Gemini/Manual --}}
+            <button class="side-item" id="btn-sync" title="Sinkron Router &amp; Mode AI (online / lokal)">
+                <span class="ic"><i class="fa-solid fa-rotate"></i></span><span class="lbl">Sinkron Router</span>
+            </button>
         </nav>
 
         <div class="side-foot">
@@ -170,6 +175,73 @@
                 <button type="submit" class="btn" style="width:100%;justify-content:center;margin-top:10px"><i class="fa-solid fa-floppy-disk"></i> Simpan Provider</button>
                 <p id="provider-msg" class="hint"></p>
             </form>
+        </div>
+    </div>
+</div>
+
+{{-- ===== Popup: Sinkron Router + Mode AI (2 dropdown: Gemini & Manual) ===== --}}
+<div class="modal" id="sync-modal">
+    <div class="modal-panel">
+        <div class="modal-head">
+            <h3><i class="fa-solid fa-rotate"></i>Sinkron Router &amp; Mode AI</h3>
+            <button class="btn ghost small icon" id="btn-sync-close" title="Tutup"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+            <p class="muted">
+                Dua dropdown berdampingan tanpa bentrok: <b>Gemini</b> (Google AI Studio)
+                dan <b>Manual</b> (Max Router / API kompatibel OpenAI — online di Railway
+                maupun lokal <code>localhost:3001</code>). Mode menentukan yang aktif.
+            </p>
+
+            {{-- Dropdown 1: Mode AI --}}
+            <label>Mode AI aktif</label>
+            <select id="sync-mode">
+                <option value="gemini">Gemini — Google AI Studio</option>
+                <option value="manual">Manual — Max Router / API sendiri (online &amp; lokal)</option>
+            </select>
+
+            {{-- Panel Gemini --}}
+            <div id="sync-gemini" class="sync-panel">
+                <label>API Key Gemini</label>
+                <input id="gemini-key" placeholder="AIza... (kosongkan = pakai yang tersimpan / .env)" autocomplete="off">
+                <label>Model Gemini</label>
+                <input id="gemini-model" placeholder="gemini-2.0-flash">
+                <p class="hint">
+                    API key gratis di
+                    <a href="https://aistudio.google.com/api-keys" target="_blank" rel="noopener">aistudio.google.com/api-keys</a>.
+                </p>
+            </div>
+
+            {{-- Panel Manual --}}
+            <div id="sync-manual" class="sync-panel">
+                <label>Sumber router (online / offline)</label>
+                <select id="manual-scope">
+                    <option value="online">Online — Max Router di Railway</option>
+                    <option value="local">Lokal — Max Router di komputer ini (localhost:3001)</option>
+                </select>
+                <label>Base URL (endpoint kompatibel OpenAI)</label>
+                <input id="manual-base" placeholder="https://instance-maxrouter-kamu.up.railway.app/v1">
+                <label>API Key Router (opsional bila REQUIRE_API_KEY=false)</label>
+                <input id="manual-key" placeholder="sk-... (kosongkan = pakai yang tersimpan / .env)" autocomplete="off">
+                <label>Model</label>
+                <input id="manual-model" placeholder="gpt-4o-mini / model hasil sinkron">
+            </div>
+
+            <div class="prow" style="margin-top:14px">
+                <button class="btn ghost" id="btn-router-status" type="button"><i class="fa-solid fa-signal"></i> Cek Status Router</button>
+                <button class="btn ghost" id="btn-router-sync" type="button"><i class="fa-solid fa-rotate"></i> Sinkron Sekarang</button>
+            </div>
+
+            <p class="hint">
+                <span class="sync-dot" id="dot-online"></span> Online (Railway): <b id="st-online">?</b><br>
+                <span class="sync-dot" id="dot-local"></span> Lokal (localhost:3001): <b id="st-local">?</b>
+            </p>
+            <p class="hint" id="sync-msg"></p>
+
+            <button class="btn" id="btn-setup-save" style="width:100%;justify-content:center;margin-top:10px" type="button">
+                <i class="fa-solid fa-floppy-disk"></i> Simpan Mode &amp; API Key
+            </button>
+            <p class="hint" id="setup-msg"></p>
         </div>
     </div>
 </div>

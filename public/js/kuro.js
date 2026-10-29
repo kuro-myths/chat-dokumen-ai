@@ -739,6 +739,131 @@
         }, 4000);
     }
 
+    // ---------- Sinkron Router & Mode AI (Gemini / Manual) ----------
+    var syncModal = document.getElementById('sync-modal');
+
+    function applySyncMode() {
+        var mode = document.getElementById('sync-mode').value;
+        document.getElementById('sync-gemini').classList.toggle('show', mode === 'gemini');
+        document.getElementById('sync-manual').classList.toggle('show', mode === 'manual');
+    }
+
+    function fillSyncStatus(router) {
+        var dotOn = document.getElementById('dot-online');
+        var dotLc = document.getElementById('dot-local');
+        var stOn = document.getElementById('st-online');
+        var stLc = document.getElementById('st-local');
+        var r = router || {};
+        function txt(x) { return x && x.reachable ? 'aktif (' + x.latency_ms + ' ms)' : 'tidak terjangkau'; }
+        stOn.textContent = r.online ? txt(r.online) : 'tidak dikonfigurasi';
+        stLc.textContent = r.local ? txt(r.local) : '—';
+        dotOn.className = 'sync-dot ' + (r.online && r.online.reachable ? 'on' : 'off');
+        dotLc.className = 'sync-dot ' + (r.local && r.local.reachable ? 'on' : 'off');
+    }
+
+    function loadSetup() {
+        fetch('/api/ai/setup', {headers: {'Accept': 'application/json'}})
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!data.ok) return;
+                document.getElementById('sync-mode').value = data.mode || 'gemini';
+                applySyncMode();
+                document.getElementById('gemini-model').value = data.gemini.model || '';
+                document.getElementById('manual-base').value = data.manual.base_url || '';
+                document.getElementById('manual-model').value = data.manual.model || '';
+                document.getElementById('setup-msg').textContent = data.gemini.api_key_set
+                    ? 'Key Gemini sudah tersimpan — isi ulang hanya untuk mengganti.'
+                    : 'Key Gemini belum diisi (ambil di aistudio.google.com/api-keys).';
+            })
+            .catch(function () {});
+    }
+
+    function loadRouterStatus() {
+        fetch('/api/ai/router/status', {headers: {'Accept': 'application/json'}})
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                fillSyncStatus(data.router);
+                var sel = document.getElementById('manual-scope');
+                if (data.router && data.router.active_scope) sel.value = data.router.active_scope;
+                var msg = document.getElementById('sync-msg');
+                if (data.synced_at) {
+                    msg.textContent = 'Sinkron terakhir: ' + data.synced_at
+                        + ' — ' + (data.models_cached ? data.models_cached.length : 0) + ' model tersimpan.';
+                } else {
+                    msg.textContent = 'Belum pernah sinkron — tekan "Sinkron Sekarang".';
+                }
+            })
+            .catch(function () {});
+    }
+
+    document.getElementById('btn-sync').addEventListener('click', function () {
+        syncModal.classList.add('open');
+        if (isMobile()) shell.classList.remove('sb-open-m');
+        loadSetup();
+        loadRouterStatus();
+    });
+    document.getElementById('btn-sync-close').addEventListener('click', function () { syncModal.classList.remove('open'); });
+    syncModal.addEventListener('click', function (e) { if (e.target === this) syncModal.classList.remove('open'); });
+
+    document.getElementById('sync-mode').addEventListener('change', applySyncMode);
+
+    document.getElementById('manual-scope').addEventListener('change', function () {
+        var base = document.getElementById('manual-base');
+        if (this.value === 'local') base.value = 'http://localhost:3001/v1';
+    });
+
+    document.getElementById('btn-router-status').addEventListener('click', loadRouterStatus);
+
+    document.getElementById('btn-router-sync').addEventListener('click', function () {
+        var msg = document.getElementById('sync-msg');
+        msg.textContent = 'Menyinkronkan…';
+        var prefer = document.getElementById('manual-scope').value; // online | local
+        fetch('/api/ai/router/sync', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF},
+            body: JSON.stringify({prefer: prefer})
+        }).then(function (r) { return r.json(); }).then(function (data) {
+            if (data.ok) {
+                msg.textContent = '✔ ' + data.message;
+                if (data.base_url) document.getElementById('manual-base').value = data.base_url;
+                loadProviders();
+                loadRouterStatus();
+                kuroThinking(false, 'Router tersinkron ✨');
+            } else {
+                msg.textContent = '✗ ' + (data.error || 'Gagal sinkron — cek URL / jalankan router lokal.');
+            }
+        }).catch(function (e) { msg.textContent = '✗ ' + e.message; });
+    });
+
+    document.getElementById('btn-setup-save').addEventListener('click', function () {
+        var msg = document.getElementById('setup-msg');
+        var body = {
+            mode: document.getElementById('sync-mode').value,
+            gemini_api_key: document.getElementById('gemini-key').value.trim() || null,
+            gemini_model: document.getElementById('gemini-model').value.trim() || null,
+            manual_base_url: document.getElementById('manual-base').value.trim() || null,
+            manual_api_key: document.getElementById('manual-key').value.trim() || null,
+            manual_model: document.getElementById('manual-model').value.trim() || null
+        };
+        fetch('/api/ai/setup', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF},
+            body: JSON.stringify(body)
+        }).then(function (r) { return r.json(); }).then(function (data) {
+            if (data.ok) {
+                msg.textContent = '✔ ' + data.message;
+                document.getElementById('gemini-key').value = '';
+                document.getElementById('manual-key').value = '';
+                currentProvider = data.mode;
+                updateProvName();
+                loadProviders();
+                kuroThinking(false, 'Mode AI tersimpan ✨');
+            } else {
+                msg.textContent = '✗ ' + (data.message || 'Gagal menyimpan setup.');
+            }
+        }).catch(function (e) { msg.textContent = '✗ ' + e.message; });
+    });
+
     // ---------- Init ----------
     loadProviders();
     loadDocs();

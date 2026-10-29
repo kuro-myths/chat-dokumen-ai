@@ -304,3 +304,11 @@ label{display:block;margin:12px 0 6px;font-size:.78rem;color:var(--muted);font-w
   .landing{justify-content:flex-start;padding-top:70px}
   .kuro-wrap{display:none}
 }
+
+
+/* ===== Sinkron Router & Mode AI (modal sync + titik status) ===== */
+.sync-panel{display:none;margin-top:2px}
+.sync-panel.show{display:block}
+.prov-dot,.sync-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#d93025;flex:none;margin-right:4px;vertical-align:middle}
+.prov-dot.on,.sync-dot.on{background:#188038}
+.prov-dot.off,.sync-dot.off{background:#d93025}
