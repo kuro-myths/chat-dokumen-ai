@@ -35,10 +35,6 @@
                 <button class="btn small api-add" id="btn-add-provider"><i class="fa-solid fa-circle-plus"></i> Tambah API Key</button>
             </div>
 
-            {{-- Sinkron Max Router + mode Gemini/Manual --}}
-            <button class="side-item" id="btn-sync" title="Sinkron Router &amp; Mode AI (online / lokal)">
-                <span class="ic"><i class="fa-solid fa-rotate"></i></span><span class="lbl">Sinkron Router</span>
-            </button>
         </nav>
 
         <div class="side-foot">
@@ -61,9 +57,18 @@
 
             {{-- Composer ala Gemini --}}
             <div class="composer" id="composer">
-                <textarea id="chat-input" rows="1" placeholder="Tanya apa saja ke Kuro — atau tempel dokumen .docx lewat ikon klip"></textarea>
+                <textarea id="chat-input" rows="1" placeholder="Tanya apa saja ke Kuro — atau tekan ikon + untuk file, folder, gambar, video, dan mode berbicara"></textarea>
                 <div class="composer-row">
-                    <button class="cp-btn" id="btn-attach" title="Unggah dokumen .docx"><i class="fa-solid fa-paperclip"></i></button>
+                    <div class="cp-attach">
+                        <button class="cp-btn" id="btn-attach" title="Tambah — file, folder, gambar, video, mode berbicara"><i class="fa-solid fa-plus"></i></button>
+                        <div class="cp-attach-menu" id="cp-attach-menu">
+                            <button type="button" class="am-item" id="am-file"><span class="ic"><i class="fa-solid fa-paperclip"></i></span> Lampirkan Dokumen (.docx)</button>
+                            <button type="button" class="am-item" id="am-docs"><span class="ic"><i class="fa-solid fa-folder-open"></i></span> Folder Dokumen</button>
+                            <button type="button" class="am-item" id="am-image"><span class="ic"><i class="fa-solid fa-image"></i></span> Generate Gambar</button>
+                            <button type="button" class="am-item" id="am-video"><span class="ic"><i class="fa-solid fa-video"></i></span> Generate Video</button>
+                            <button type="button" class="am-item" id="am-speak"><span class="ic"><i class="fa-solid fa-volume-high"></i></span> Mode Berbicara <b class="am-state" id="am-speak-state">Mati</b></button>
+                        </div>
+                    </div>
                     <div class="cp-prov">
                         <button class="cp-prov-btn" id="cp-prov-btn" title="Pilih provider AI">
                             <i class="fa-solid fa-robot"></i>
@@ -72,6 +77,7 @@
                         </button>
                         <div class="cp-prov-menu" id="cp-prov-menu"></div>
                     </div>
+                    <span class="gen-chip" id="gen-chip" hidden></span>
                     <span class="cp-status" id="chat-status"></span>
                     <button class="cp-btn" id="btn-save-chat" title="Simpan percakapan"><i class="fa-solid fa-floppy-disk"></i></button>
                     <button class="cp-btn" id="btn-mic" title="Dikte suara (bahasa Indonesia)"><i class="fa-solid fa-microphone"></i></button>
@@ -131,12 +137,7 @@
     </main>
 </div>
 
-{{-- ===== Maskot Kuro (SVG eksternal + animasi SMIL) ===== --}}
-<div class="kuro-wrap" id="kuro">
-    <div class="kuro-bubble" id="kuro-bubble">Kuro siap membantu ✨</div>
-    <img class="kuro-svg" src="{{ asset('img/kuro.svg') }}" alt="Maskot Kuro" width="110">
-    <div class="kuro-scan"></div>
-</div>
+{{-- Maskot & bubble "Kuro siap membantu" dihapus sesuai permintaan --}}
 
 {{-- ===== Popup: Tambah API Key / Provider ===== --}}
 <div class="modal" id="prov-modal">
@@ -173,6 +174,9 @@
                 <button type="submit" class="btn" style="width:100%;justify-content:center;margin-top:10px"><i class="fa-solid fa-floppy-disk"></i> Simpan Provider</button>
                 <p id="provider-msg" class="hint"></p>
             </form>
+            <button class="btn ghost" id="btn-open-sync" type="button" style="width:100%;justify-content:center;margin-top:12px">
+                <i class="fa-solid fa-rotate"></i> Sinkron Router &amp; Mode AI (online / lokal)
+            </button>
         </div>
     </div>
 </div>
@@ -284,3 +288,4 @@
 @push('scripts')
 <script src="{{ asset('js/kuro.js') }}"></script>
 @endpush
+

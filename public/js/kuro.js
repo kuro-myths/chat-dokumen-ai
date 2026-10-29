@@ -26,22 +26,8 @@
 
     function isMobile() { return window.innerWidth <= 960; }
 
-    // ---------- Maskot Kuro ----------
-    var kuroEl = document.getElementById('kuro');
-    var kuroBubble = document.getElementById('kuro-bubble');
-    var thinkingCount = 0;
-
-    function kuroThinking(on, text) {
-        thinkingCount = Math.max(0, thinkingCount + (on ? 1 : -1));
-        if (text) kuroBubble.textContent = text;
-        if (thinkingCount > 0) {
-            kuroEl.classList.add('thinking');
-            if (!text) kuroBubble.textContent = 'Kuro sedang menganalisis… 🔍';
-        } else {
-            kuroEl.classList.remove('thinking');
-            kuroBubble.textContent = 'Kuro siap membantu ✨';
-        }
-    }
+    // ---------- Maskot Kuro (dihapus dari UI — no-op agar sisa kode tetap aman) ----------
+    function kuroThinking() {}
 
     // ---------- Sidebar buka/tutup ----------
     var sbClosed = false;
@@ -261,7 +247,31 @@
         history.forEach(function (m) {
             var div = document.createElement('div');
             div.className = 'msg ' + (m.role === 'user' ? 'user' : 'ai');
-            div.textContent = m.content;
+            if (m.type === 'image' && m.image) {
+                if (m.content) {
+                    var cap = document.createElement('div');
+                    cap.className = 'msg-cap';
+                    cap.textContent = m.content;
+                    div.appendChild(cap);
+                }
+                var img = document.createElement('img');
+                img.className = 'msg-media';
+                img.src = m.image;
+                img.alt = m.content || 'Gambar hasil AI';
+                div.appendChild(img);
+            } else if (m.type === 'video' && m.video) {
+                var cap2 = document.createElement('div');
+                cap2.className = 'msg-cap';
+                cap2.textContent = '🎬 ' + (m.content || '');
+                div.appendChild(cap2);
+                var vid = document.createElement('video');
+                vid.className = 'msg-media';
+                vid.src = m.video;
+                vid.controls = true;
+                div.appendChild(vid);
+            } else {
+                div.textContent = m.content;
+            }
             chatLog.appendChild(div);
         });
         chatLog.scrollTop = chatLog.scrollHeight;
@@ -294,6 +304,20 @@
         if (!text) return;
         var btn = document.getElementById('chat-send');
         var status = document.getElementById('chat-status');
+        if (genMode === 'image') {
+            chatInput.value = '';
+            autoGrow();
+            setMode('chat');
+            generateImage(text);
+            return;
+        }
+        if (genMode === 'video') {
+            chatInput.value = '';
+            autoGrow();
+            setMode('chat');
+            generateVideo(text);
+            return;
+        }
         history.push({role: 'user', content: text});
         renderChat();
         chatInput.value = '';
@@ -321,6 +345,7 @@
                 renderChat();
                 status.textContent = '✔ ' + data.provider + ' · ' + data.model;
                 kuroThinking(false, 'Selesai! Ada lagi? ✨');
+                speak(data.content);
                 saveCurrent();
             } else {
                 history.pop();
@@ -350,6 +375,101 @@
         chatInput.style.height = Math.min(chatInput.scrollHeight, 190) + 'px';
     }
     chatInput.addEventListener('input', autoGrow);
+
+    // ---------- Generate gambar & video (Gemini image / Veo) ----------
+    function generateImage(prompt) {
+        var status = document.getElementById('chat-status');
+        var btn = document.getElementById('chat-send');
+        history.push({role: 'user', content: '🎨 ' + prompt});
+        renderChat();
+        setMode('chat');
+        btn.disabled = true;
+        status.textContent = 'Membuat gambar… (±10–30 detik)';
+        fetch('/api/ai/generate/image', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF},
+            body: JSON.stringify({prompt: prompt})
+        }).then(function (r) { return r.json(); }).then(function (data) {
+            if (data.ok) {
+                history.push({role: 'assistant', type: 'image', content: data.text || prompt, image: data.image});
+                renderChat();
+                status.textContent = '✔ Gambar dibuat · ' + data.model;
+                saveCurrent();
+            } else {
+                status.textContent = '';
+                alert(data.error || 'Gagal membuat gambar.');
+            }
+        }).catch(function (e) {
+            status.textContent = '';
+            alert(e.message);
+        }).finally(function () {
+            btn.disabled = false;
+            setGenMode(null);
+            chatInput.focus();
+        });
+    }
+
+    function generateVideo(prompt) {
+        var status = document.getElementById('chat-status');
+        var btn = document.getElementById('chat-send');
+        history.push({role: 'user', content: '🎬 ' + prompt});
+        renderChat();
+        setMode('chat');
+        btn.disabled = true;
+        status.textContent = 'Membuat video… (±1–2 menit)';
+        fetch('/api/ai/generate/video', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF},
+            body: JSON.stringify({prompt: prompt})
+        }).then(function (r) { return r.json(); }).then(function (data) {
+            if (!data.ok) {
+                status.textContent = '';
+                alert(data.error || 'Gagal membuat video.');
+                btn.disabled = false;
+                setGenMode(null);
+                return;
+            }
+            var op = data.operation;
+            var tries = 0;
+            var timer = setInterval(function () {
+                tries++;
+                fetch('/api/ai/generate/video/status?operation=' + encodeURIComponent(op), {headers: {'Accept': 'application/json'}})
+                    .then(function (r) { return r.json(); })
+                    .then(function (s) {
+                        if (s.ok && s.done && s.uri) {
+                            clearInterval(timer);
+                            history.push({role: 'assistant', type: 'video', content: prompt, video: s.uri});
+                            renderChat();
+                            status.textContent = '✔ Video siap · Veo';
+                            saveCurrent();
+                            btn.disabled = false;
+                            setGenMode(null);
+                        } else if (!s.ok) {
+                            clearInterval(timer);
+                            status.textContent = '';
+                            alert(s.error || 'Gagal membuat video.');
+                            btn.disabled = false;
+                            setGenMode(null);
+                        } else {
+                            status.textContent = 'Membuat video… (' + (tries * 8) + ' detik)';
+                        }
+                    })
+                    .catch(function () {});
+                if (tries >= 45) {
+                    clearInterval(timer);
+                    status.textContent = '';
+                    alert('Video terlalu lama dibuat — coba lagi nanti.');
+                    btn.disabled = false;
+                    setGenMode(null);
+                }
+            }, 8000);
+        }).catch(function (e) {
+            status.textContent = '';
+            alert(e.message);
+            btn.disabled = false;
+            setGenMode(null);
+        });
+    }
 
     document.getElementById('btn-new-chat').addEventListener('click', function () {
         history = [];
@@ -551,9 +671,87 @@
         apiDrop.classList.add('open');
     });
 
-    // Unggah lewat ikon klip / tombol di modal dokumen
+    // Unggah lewat tombol + / tombol di modal dokumen
     var attachInput = document.getElementById('attach-file');
-    document.getElementById('btn-attach').addEventListener('click', function () { attachInput.click(); });
+    var attachBtn = document.getElementById('btn-attach');
+    var attachMenu = document.getElementById('cp-attach-menu');
+    var genChip = document.getElementById('gen-chip');
+
+    attachBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        attachMenu.classList.toggle('open');
+    });
+    document.addEventListener('click', function (e) {
+        if (!attachMenu.contains(e.target) && !attachBtn.contains(e.target)) attachMenu.classList.remove('open');
+    });
+
+    // ---------- Mode generate (gambar / video) ----------
+    var genMode = null; // null | 'image' | 'video'
+    function setGenMode(mode, label) {
+        genMode = mode;
+        if (mode) {
+            genChip.hidden = false;
+            genChip.textContent = label + ' — tulis deskripsinya lalu kirim';
+        } else {
+            genChip.hidden = true;
+            genChip.textContent = '';
+        }
+    }
+
+    document.getElementById('am-file').addEventListener('click', function () {
+        attachMenu.classList.remove('open');
+        setGenMode(null);
+        attachInput.click();
+    });
+    document.getElementById('am-docs').addEventListener('click', function () {
+        attachMenu.classList.remove('open');
+        setGenMode(null);
+        openDocModal();
+    });
+    document.getElementById('am-image').addEventListener('click', function () {
+        attachMenu.classList.remove('open');
+        setGenMode('image', '🎨 Mode Gambar');
+        chatInput.focus();
+    });
+    document.getElementById('am-video').addEventListener('click', function () {
+        attachMenu.classList.remove('open');
+        setGenMode('video', '🎬 Mode Video');
+        chatInput.focus();
+    });
+
+    // ---------- Mode Berbicara (AI membacakan jawaban — TTS browser) ----------
+    var speakMode = false;
+    try { speakMode = localStorage.getItem('kuro_speak') === 'on'; } catch (e) {}
+    var speakState = document.getElementById('am-speak-state');
+
+    function applySpeak() {
+        speakState.textContent = speakMode ? 'Nyala' : 'Mati';
+        speakState.classList.toggle('on', speakMode);
+    }
+    function speak(text) {
+        if (!speakMode || !window.speechSynthesis || !text) return;
+        try {
+            window.speechSynthesis.cancel();
+            var u = new SpeechSynthesisUtterance(String(text).slice(0, 4000));
+            u.lang = 'id-ID';
+            u.rate = 1;
+            var voices = window.speechSynthesis.getVoices() || [];
+            for (var i = 0; i < voices.length; i++) {
+                if (/id[-_]ID|Indones/i.test(voices[i].lang + ' ' + voices[i].name)) { u.voice = voices[i]; break; }
+            }
+            window.speechSynthesis.speak(u);
+        } catch (e) {}
+    }
+    applySpeak();
+    if (window.speechSynthesis) { try { window.speechSynthesis.getVoices(); } catch (e) {} }
+    document.getElementById('am-speak').addEventListener('click', function () {
+        attachMenu.classList.remove('open');
+        speakMode = !speakMode;
+        try { localStorage.setItem('kuro_speak', speakMode ? 'on' : 'off'); } catch (e) {}
+        applySpeak();
+        if (speakMode) { speak('Mode berbicara aktif.'); }
+        else if (window.speechSynthesis) { try { window.speechSynthesis.cancel(); } catch (e) {} }
+    });
     document.getElementById('btn-doc-upload').addEventListener('click', function () { attachInput.click(); });
     attachInput.addEventListener('change', function () {
         var file = attachInput.files[0];
@@ -795,7 +993,8 @@
             .catch(function () {});
     }
 
-    document.getElementById('btn-sync').addEventListener('click', function () {
+    document.getElementById('btn-open-sync').addEventListener('click', function () {
+        provModal.classList.remove('open');
         syncModal.classList.add('open');
         if (isMobile()) shell.classList.remove('sb-open-m');
         loadSetup();
@@ -918,3 +1117,4 @@
     renderChat();
     restoreCurrent();
 })();
+

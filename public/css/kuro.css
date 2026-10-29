@@ -323,3 +323,20 @@ label{display:block;margin:12px 0 6px;font-size:.78rem;color:var(--muted);font-w
 .badge-free{background:rgba(24,128,56,.18);color:#81c995;border:1px solid rgba(24,128,56,.5)}
 .badge-paid{background:rgba(217,48,37,.15);color:#f28b82;border:1px solid rgba(217,48,37,.5)}
 .badge-unknown{background:rgba(255,255,255,.08);color:#9aa0a6;border:1px solid rgba(255,255,255,.2)}
+
+
+
+/* ===== Menu + (lampirkan / folder / generate / berbicara) ===== */
+.cp-attach{position:relative}
+.cp-attach-menu{display:none;position:absolute;bottom:calc(100% + 10px);left:0;min-width:255px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 34px rgba(33,31,43,.16);padding:6px;z-index:60}
+.cp-attach-menu.open{display:block}
+.am-item{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;font:inherit;font-size:13.5px;color:var(--text);padding:9px 10px;border-radius:10px;cursor:pointer;text-align:left}
+.am-item:hover{background:var(--accent-soft)}
+.am-item .ic{flex:none;width:26px;height:26px;border-radius:8px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:12px}
+.am-state{margin-left:auto;font-size:10.5px;font-weight:700;letter-spacing:.4px;color:#9a6700;background:var(--warn-bg);padding:2px 8px;border-radius:99px}
+.am-state.on{color:#188038;background:var(--ok-bg)}
+.gen-chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:var(--accent);background:var(--accent-soft);border:1px solid var(--line);padding:4px 10px;border-radius:99px;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gen-chip[hidden]{display:none}
+.msg-cap{font-size:12.5px;color:var(--muted);margin-bottom:6px}
+.msg-media{max-width:100%;max-height:340px;border-radius:12px;display:block}
+.msg video.msg-media{width:100%;max-height:400px}

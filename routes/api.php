@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AiSetupController;
 use App\Http\Controllers\Api\CommentController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\HighlightController;
+use App\Http\Controllers\Api\GenerateController;
 use App\Http\Controllers\Api\ModelController;
 use App\Http\Controllers\Api\ProviderController;
 use App\Http\Controllers\Api\ReviewController;
@@ -52,3 +53,9 @@ Route::post('ai/setup', [AiSetupController::class, 'store']);
 // ---------- Sinkron Max Router (online: Railway / offline: localhost) ----------
 Route::get('ai/router/status', [RouterSyncController::class, 'status']);
 Route::post('ai/router/sync', [RouterSyncController::class, 'sync']);
+
+// ---------- Generate gambar & video (Gemini image / Veo, key AI Studio) ----------
+Route::post('ai/generate/image', [GenerateController::class, 'image']);
+Route::post('ai/generate/video', [GenerateController::class, 'video']);
+Route::get('ai/generate/video/status', [GenerateController::class, 'videoStatus']);
+
