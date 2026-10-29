@@ -9,7 +9,7 @@
         <div class="brand">
             <button class="side-toggle" id="btn-side-toggle" title="Buka / tutup sidebar"><i class="fa-solid fa-bars"></i></button>
             <div class="logo"><img src="{{ asset('img/kuro-logo.svg') }}" alt="Logo Kuro AI"></div>
-            <div class="brand-txt">Kuro AI<small>Asisten skripsi &amp; proposal</small></div>
+            <div class="brand-txt">Kuro AI<small>Teman bincang AI</small></div>
         </div>
 
         <button class="new-chat" id="btn-new-chat" title="Percakapan baru">

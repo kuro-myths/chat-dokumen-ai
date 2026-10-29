@@ -254,7 +254,7 @@
         if (!history.length) {
             var empty = document.createElement('div');
             empty.className = 'chat-empty';
-            empty.innerHTML = 'Halo! Saya <b>Kuro</b> 🐾 asisten akademikmu.<br>' +
+            empty.innerHTML = 'Halo! Saya <b>Kuro</b> 🐾 teman bincangmu.<br>' +
                 'Tulis pesan di bawah, atau tekan ikon mic untuk mendikte dengan suara.';
             chatLog.appendChild(empty);
             return;
@@ -516,7 +516,7 @@
             div.title = 'Klik untuk membuka dokumen ini';
             div.innerHTML =
                 '<div class="grow"><b>' + esc(d.title) + '</b>' +
-                '<small>#' + d.id + ' · ' + esc(d.type) + ' · ' + esc(d.status) + '</small></div>' +
+                '<small>#' + d.id + ' · ' + esc(d.status) + '</small></div>' +
                 '<span class="badge ' + esc(d.status) + '">' + esc(d.status) + '</span>' +
                 '<div class="doc-actions">' +
                 '<a class="btn small ghost dl-btn"><i class="fa-solid fa-download"></i></a>' +

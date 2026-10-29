@@ -11,7 +11,7 @@
         </div>
         <img class="login-logo" src="{{ asset('img/kuro-logo.svg') }}" alt="Logo Kuro AI">
         <h1 style="margin-top:4px">Kuro AI</h1>
-        <p class="muted">Voice · Cek Model · Periksa Dokumen — masuk untuk melanjutkan.</p>
+        <p class="muted">Teman bincang AI — voice, dokumen, model — masuk untuk melanjutkan.</p>
 
         @if ($errors->any())
             <div class="alert">{{ $errors->first() }}</div>
