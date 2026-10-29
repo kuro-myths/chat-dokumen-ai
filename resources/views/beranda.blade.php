@@ -242,12 +242,24 @@
             </p>
             <p class="hint" id="sync-msg"></p>
 
-            <label style="margin-top:14px">Daftar Model — mana yang gratis / berbayar</label>
-            <button class="btn ghost" id="btn-model-list" type="button" style="width:100%;justify-content:center">
-                <i class="fa-solid fa-list"></i> Tampilkan Daftar Model
+            <label style="margin-top:14px">Cari model yang tersedia — mana yang gratis / berbayar</label>
+            <div class="model-drop" id="model-drop">
+                <div class="model-field">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input id="model-search" type="text" placeholder="Ketik nama model… (mis. gemini, flash, pro)" autocomplete="off">
+                    <select id="model-tier" class="model-tier">
+                        <option value="all">Semua</option>
+                        <option value="free">Gratis</option>
+                        <option value="paid">Berbayar</option>
+                    </select>
+                    <i class="fa-solid fa-chevron-down model-caret"></i>
+                </div>
+                <div class="model-menu" id="model-list"></div>
+            </div>
+            <button class="btn ghost" id="btn-model-list" type="button" style="width:100%;justify-content:center;margin-top:8px">
+                <i class="fa-solid fa-rotate"></i> Muat / Perbarui Daftar Model
             </button>
-            <p class="hint" id="model-count"></p>
-            <div class="model-list" id="model-list"></div>
+            <p class="hint" id="model-count">Klik model pada dropdown untuk menyalin namanya.</p>
 
             <button class="btn" id="btn-setup-save" style="width:100%;justify-content:center;margin-top:10px" type="button">
                 <i class="fa-solid fa-floppy-disk"></i> Simpan Mode &amp; API Key
@@ -287,6 +299,7 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('js/kuro.js') }}?v=20261029-4"></script>
+<script src="{{ asset('js/kuro.js') }}?v=20261029-5"></script>
 @endpush
+
 

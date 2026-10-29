@@ -314,17 +314,69 @@ label{display:block;margin:12px 0 6px;font-size:.78rem;color:var(--muted);font-w
 .prov-dot.off,.sync-dot.off{background:#d93025}
 
 
-/* ===== Daftar model: gratis / berbayar ===== */
-.model-list{max-height:230px;overflow:auto;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:8px;margin-top:6px;background:rgba(0,0,0,.18);display:none}
-.model-item{display:flex;align-items:center;gap:8px;padding:4px 6px;font-size:12.5px}
-.model-item code{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
-.model-price{font-size:11px;opacity:.75;flex:none}
-.badge-free,.badge-paid,.badge-unknown{flex:none;font-size:10px;font-weight:700;letter-spacing:.4px;padding:2px 7px;border-radius:99px}
-.badge-free{background:rgba(24,128,56,.18);color:#81c995;border:1px solid rgba(24,128,56,.5)}
-.badge-paid{background:rgba(217,48,37,.15);color:#f28b82;border:1px solid rgba(217,48,37,.5)}
-.badge-unknown{background:rgba(255,255,255,.08);color:#9aa0a6;border:1px solid rgba(255,255,255,.2)}
+/* ===== Daftar model: pencarian + dropdown (gratis / berbayar) ===== */
+.model-drop{position:relative;margin-top:6px}
+.model-field{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);
+  border-radius:12px;padding:2px 6px 2px 12px;transition:border-color .15s,box-shadow .15s;cursor:text}
+.model-field:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(109,94,252,.12)}
+.model-field > .fa-magnifying-glass{color:var(--muted);font-size:.82rem;flex:none}
+.model-field input{border:none;box-shadow:none;padding:9px 2px;background:transparent;flex:1;min-width:0}
+.model-field input:focus{border:none;box-shadow:none}
+.model-field select{width:auto;flex:none;border:1px solid var(--line);border-radius:999px;
+  padding:5px 8px;font-size:.74rem;cursor:pointer;background:#fff}
+.model-caret{color:var(--muted);font-size:.65rem;transition:transform .15s;flex:none;pointer-events:none}
+.model-drop.open .model-caret{transform:rotate(180deg)}
+.model-menu{display:none;margin-top:8px;background:#fff;border:1px solid var(--line);border-radius:14px;
+  box-shadow:0 14px 40px rgba(33,31,43,.16);padding:6px;max-height:250px;overflow-y:auto}
+.model-drop.open .model-menu{display:block;animation:kuro-drop .16s ease}
+@keyframes kuro-drop{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.model-item{display:flex;align-items:center;gap:8px;width:100%;border:none;background:transparent;cursor:pointer;
+  font:inherit;font-size:.8rem;color:var(--text);padding:8px 10px;border-radius:10px;text-align:left;
+  transition:background .12s}
+.model-item:hover{background:var(--accent-soft)}
+.model-item code{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  background:transparent;border:none;padding:0;font-size:.74rem}
+.model-price{font-size:.66rem;color:var(--muted);flex:none}
+.model-copy{flex:none;color:var(--muted);font-size:.72rem;opacity:0;transition:opacity .12s,color .12s}
+.model-item:hover .model-copy{opacity:1;color:var(--accent)}
+.model-empty{color:var(--muted);font-size:.78rem;text-align:center;padding:14px 8px;margin:0}
+.badge-free,.badge-paid,.badge-unknown{flex:none;font-size:.62rem;font-weight:700;letter-spacing:.4px;padding:2px 7px;border-radius:99px}
+.badge-free{background:var(--ok-bg);color:var(--ok);border:1px solid #b7dfc6}
+.badge-paid{background:var(--err-bg);color:var(--err);border:1px solid #f3c2bd}
+.badge-unknown{background:var(--soft);color:var(--muted);border:1px solid var(--line)}
 
+/* ===== Popup modern Kuro (alert bawaan browser diganti) ===== */
+.kalert{position:fixed;inset:0;z-index:300;display:none;align-items:center;justify-content:center;
+  background:rgba(33,31,43,.45);backdrop-filter:blur(6px);padding:24px}
+.kalert.open{display:flex}
+.kalert-panel{width:100%;max-width:400px;background:#fff;border:1px solid var(--line);border-radius:22px;
+  padding:28px 24px 22px;text-align:center;box-shadow:0 24px 70px rgba(33,31,43,.30);
+  animation:kalert-pop .18s ease}
+@keyframes kalert-pop{from{opacity:0;transform:translateY(14px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+.kalert-ic{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  margin:0 auto 14px;font-size:1.35rem}
+.kalert-ic.error{background:var(--err-bg);color:var(--err)}
+.kalert-ic.success{background:var(--ok-bg);color:var(--ok)}
+.kalert-ic.info{background:var(--accent-soft);color:var(--accent)}
+.kalert-title{margin:0 0 8px;font-size:1.05rem;font-weight:800;letter-spacing:-.01em}
+.kalert-msg{margin:0 0 18px;font-size:.86rem;color:var(--muted);line-height:1.6;
+  white-space:pre-wrap;word-break:break-word}
+.kalert-ok{min-width:130px;justify-content:center}
+.kprompt-input{margin:0 0 18px;text-align:left}
+.kprompt-act{display:flex;gap:10px;justify-content:center}
+.kprompt-act .btn{min-width:110px;justify-content:center}
 
+/* ===== Toast kecil (notifikasi singkat) ===== */
+.ktoast-wrap{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:320;
+  display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+.ktoast{display:flex;align-items:center;gap:9px;background:#211f2b;color:#fff;border-radius:999px;
+  padding:10px 18px;font-size:.8rem;font-weight:600;box-shadow:0 10px 30px rgba(33,31,43,.30);
+  animation:ktoast-in .22s ease;max-width:88vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ktoast.ok{background:#188038}
+.ktoast.err{background:#d93025}
+.ktoast.out{animation:ktoast-out .2s ease forwards}
+@keyframes ktoast-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes ktoast-out{to{opacity:0;transform:translateY(10px)}}
 
 /* ===== Menu + (lampirkan / folder / generate / berbicara) ===== */
 .cp-attach{position:relative}
@@ -340,3 +392,4 @@ label{display:block;margin:12px 0 6px;font-size:.78rem;color:var(--muted);font-w
 .msg-cap{font-size:12.5px;color:var(--muted);margin-bottom:6px}
 .msg-media{max-width:100%;max-height:340px;border-radius:12px;display:block}
 .msg video.msg-media{width:100%;max-height:400px}
+

@@ -26,6 +26,100 @@
 
     function isMobile() { return window.innerWidth <= 960; }
 
+    // ---------- Popup modern Kuro (mengganti alert/prompt bawaan browser) ----------
+    var kalertEl = null;   // popup notifikasi
+    var kpromptEl = null;  // popup input (mengganti window.prompt)
+    var ktoastWrap = null; // wadah toast kecil
+
+    var KALERT_IC = {
+        error:   'fa-solid fa-triangle-exclamation',
+        success: 'fa-solid fa-circle-check',
+        info:    'fa-solid fa-circle-info'
+    };
+    var KALERT_TITLE = { error: 'Ada kendala', success: 'Berhasil', info: 'Pemberitahuan' };
+
+    function kuroAlert(msg, type) {
+        type = KALERT_IC[type] ? type : 'error';
+        if (!kalertEl) {
+            kalertEl = document.createElement('div');
+            kalertEl.className = 'kalert';
+            kalertEl.innerHTML =
+                '<div class="kalert-panel" role="dialog" aria-modal="true">' +
+                '<div class="kalert-ic"></div>' +
+                '<h4 class="kalert-title"></h4>' +
+                '<p class="kalert-msg"></p>' +
+                '<button type="button" class="btn kalert-ok">Oke, mengerti</button>' +
+                '</div>';
+            document.body.appendChild(kalertEl);
+            kalertEl.addEventListener('click', function (e) { if (e.target === kalertEl) closeKuroAlert(); });
+            kalertEl.querySelector('.kalert-ok').addEventListener('click', closeKuroAlert);
+        }
+        var ic = kalertEl.querySelector('.kalert-ic');
+        ic.className = 'kalert-ic ' + type;
+        ic.innerHTML = '<i class="' + KALERT_IC[type] + '"></i>';
+        kalertEl.querySelector('.kalert-title').textContent = KALERT_TITLE[type];
+        kalertEl.querySelector('.kalert-msg').textContent = msg;
+        kalertEl.classList.add('open');
+    }
+
+    function closeKuroAlert() { if (kalertEl) kalertEl.classList.remove('open'); }
+
+    // Prompt modern (mengganti window.prompt) — cb dipanggil saat "Simpan"
+    function kuroPrompt(title, value, cb) {
+        if (!kpromptEl) {
+            kpromptEl = document.createElement('div');
+            kpromptEl.className = 'kalert';
+            kpromptEl.innerHTML =
+                '<div class="kalert-panel" role="dialog" aria-modal="true">' +
+                '<div class="kalert-ic info"><i class="fa-solid fa-floppy-disk"></i></div>' +
+                '<h4 class="kalert-title"></h4>' +
+                '<input class="kprompt-input" type="text" maxlength="60" placeholder="Nama percakapan">' +
+                '<div class="kprompt-act">' +
+                '<button type="button" class="btn ghost kprompt-cancel">Batal</button>' +
+                '<button type="button" class="btn kprompt-ok">Simpan</button>' +
+                '</div></div>';
+            document.body.appendChild(kpromptEl);
+            kpromptEl.addEventListener('click', function (e) { if (e.target === kpromptEl) closeKuroPrompt(); });
+            kpromptEl.querySelector('.kprompt-cancel').addEventListener('click', closeKuroPrompt);
+            kpromptEl.querySelector('.kprompt-ok').addEventListener('click', function () {
+                var v = kpromptEl.querySelector('.kprompt-input').value.trim();
+                closeKuroPrompt();
+                cb(v);
+            });
+            kpromptEl.querySelector('.kprompt-input').addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') { e.preventDefault(); kpromptEl.querySelector('.kprompt-ok').click(); }
+            });
+        }
+        kpromptEl.querySelector('.kalert-title').textContent = title;
+        var input = kpromptEl.querySelector('.kprompt-input');
+        input.value = value || '';
+        kpromptEl.classList.add('open');
+        setTimeout(function () { input.focus(); input.select(); }, 60);
+    }
+
+    function closeKuroPrompt() { if (kpromptEl) kpromptEl.classList.remove('open'); }
+
+    // Toast kecil untuk notifikasi singkat (mis. model disalin)
+    function kuroToast(msg, type) {
+        if (!ktoastWrap) {
+            ktoastWrap = document.createElement('div');
+            ktoastWrap.className = 'ktoast-wrap';
+            document.body.appendChild(ktoastWrap);
+        }
+        var t = document.createElement('div');
+        t.className = 'ktoast' + (type ? ' ' + type : '');
+        t.textContent = msg;
+        ktoastWrap.appendChild(t);
+        setTimeout(function () {
+            t.classList.add('out');
+            setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 220);
+        }, 2600);
+    }
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') { closeKuroAlert(); closeKuroPrompt(); }
+    });
+
     // ---------- Maskot Kuro (dihapus dari UI — no-op agar sisa kode tetap aman) ----------
     function kuroThinking() {}
 
@@ -367,14 +461,14 @@
                 renderChat();
                 status.textContent = '';
                 kuroThinking(false, 'Ada kendala 😿');
-                alert(data.error || 'Gagal.');
+                kuroAlert(data.error || 'Gagal.');
             }
         }).catch(function (e) {
             history.pop();
             renderChat();
             status.textContent = '';
             kuroThinking(false, 'Ada kendala 😿');
-            alert(e.message);
+            kuroAlert(e.message);
         }).finally(function () { btn.disabled = false; chatInput.focus(); });
     }
 
@@ -412,11 +506,11 @@
                 saveCurrent();
             } else {
                 status.textContent = '';
-                alert(data.error || 'Gagal membuat gambar.');
+                kuroAlert(data.error || 'Gagal membuat gambar.');
             }
         }).catch(function (e) {
             status.textContent = '';
-            alert(e.message);
+            kuroAlert(e.message);
         }).finally(function () {
             btn.disabled = false;
             setGenMode(null);
@@ -439,7 +533,7 @@
         }).then(function (r) { return r.json(); }).then(function (data) {
             if (!data.ok) {
                 status.textContent = '';
-                alert(data.error || 'Gagal membuat video.');
+                kuroAlert(data.error || 'Gagal membuat video.');
                 btn.disabled = false;
                 setGenMode(null);
                 return;
@@ -462,7 +556,7 @@
                         } else if (!s.ok) {
                             clearInterval(timer);
                             status.textContent = '';
-                            alert(s.error || 'Gagal membuat video.');
+                            kuroAlert(s.error || 'Gagal membuat video.');
                             btn.disabled = false;
                             setGenMode(null);
                         } else {
@@ -473,14 +567,14 @@
                 if (tries >= 45) {
                     clearInterval(timer);
                     status.textContent = '';
-                    alert('Video terlalu lama dibuat — coba lagi nanti.');
+                    kuroAlert('Video terlalu lama dibuat — coba lagi nanti.');
                     btn.disabled = false;
                     setGenMode(null);
                 }
             }, 8000);
         }).catch(function (e) {
             status.textContent = '';
-            alert(e.message);
+            kuroAlert(e.message);
             btn.disabled = false;
             setGenMode(null);
         });
@@ -504,7 +598,7 @@
 
     document.getElementById('btn-mic').addEventListener('click', function () {
         var micBtn = document.getElementById('btn-mic');
-        if (!SR) { alert('Browser belum mendukung input suara — coba Chrome/Edge terbaru.'); return; }
+        if (!SR) { kuroAlert('Browser belum mendukung input suara — coba Chrome/Edge terbaru.'); return; }
         if (listening) { rec.stop(); return; }
         rec = new SR();
         rec.lang = 'id-ID';
@@ -531,7 +625,7 @@
             micBtn.innerHTML = MIC_HTML;
             micBtn.classList.remove('rec');
             kuroThinking(false, 'Suara gagal 😿');
-            alert('Error suara: ' + e.error);
+            kuroAlert('Error suara: ' + e.error);
         };
         rec.start();
     });
@@ -546,20 +640,20 @@
     }
 
     document.getElementById('btn-save-chat').addEventListener('click', function () {
-        if (!history.length) { alert('Belum ada percakapan untuk disimpan.'); return; }
+        if (!history.length) { kuroAlert('Belum ada percakapan untuk disimpan.', 'info'); return; }
         var firstUser = '';
         history.forEach(function (m) { if (!firstUser && m.role === 'user') firstUser = m.content; });
-        var title = prompt('Nama percakapan:', (firstUser || 'Percakapan').slice(0, 40));
-        if (title === null) return;
-        var list = getSaved();
-        list.unshift({
-            title: title || 'Percakapan',
-            time: new Date().toLocaleString('id-ID'),
-            provider: currentProvider,
-            messages: history.slice()
+        kuroPrompt('Simpan percakapan', (firstUser || 'Percakapan').slice(0, 40), function (title) {
+            var list = getSaved();
+            list.unshift({
+                title: title || 'Percakapan',
+                time: new Date().toLocaleString('id-ID'),
+                provider: currentProvider,
+                messages: history.slice()
+            });
+            setSaved(list);
+            kuroThinking(false, 'Percakapan tersimpan 💾');
         });
-        setSaved(list);
-        kuroThinking(false, 'Percakapan tersimpan 💾');
     });
 
     function renderHistory() {
@@ -776,7 +870,7 @@
     });
 
     function uploadDoc(file) {
-        if (!/\.docx$/i.test(file.name)) { alert('File harus berformat .docx'); return; }
+        if (!/\.docx$/i.test(file.name)) { kuroAlert('File harus berformat .docx'); return; }
         kuroThinking(true, 'Kuro mengimpor dokumen… 📥');
         var fd = new FormData();
         fd.append('document', file);
@@ -796,7 +890,7 @@
                     startReview(id);
                 }
             })
-            .catch(function (e) { kuroThinking(false); alert(e.message); });
+            .catch(function (e) { kuroThinking(false); kuroAlert(e.message); });
     }
 
     // ---------- Split-screen: buka dokumen ----------
@@ -889,7 +983,7 @@
                 renderDocView(doc);
                 kuroThinking(false);
             })
-            .catch(function (e) { kuroThinking(false); alert(e.message); });
+            .catch(function (e) { kuroThinking(false); kuroAlert(e.message); });
     }
 
     document.getElementById('dp-close').addEventListener('click', function () {
@@ -915,7 +1009,7 @@
         }).then(function (r) { return r.json(); }).then(function () {
             loadDocs();
             pollReview(id);
-        }).catch(function (e) { kuroThinking(false); alert(e.message); });
+        }).catch(function (e) { kuroThinking(false); kuroAlert(e.message); });
     }
 
     function pollReview(id) {
@@ -1109,23 +1203,55 @@
         }).catch(function (e) { msg.textContent = '✗ ' + e.message; });
     });
 
-    // ---------- Daftar model: gratis / berbayar ----------
-    function renderModelList(models) {
-        var list = document.getElementById('model-list');
-        var count = document.getElementById('model-count');
-        list.style.display = 'block';
-        list.innerHTML = '';
-        var free = 0, paid = 0, unknown = 0;
-        (models || []).forEach(function (m) {
-            var tier = m.tier || 'unknown';
-            if (tier === 'free') free++; else if (tier === 'paid') paid++; else unknown++;
-            var row = document.createElement('div');
+    // ---------- Daftar model: pencarian + dropdown (gratis / berbayar) ----------
+    var availableModels = [];
+
+    function openModelDrop(open) {
+        var d = document.getElementById('model-drop');
+        if (d) d.classList.toggle('open', !!open);
+    }
+
+    function copyModelId(id) {
+        var done = function () { kuroToast('Model "' + id + '" disalin ke clipboard', 'ok'); };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(id).then(done, done);
+        } else {
+            var ta = document.createElement('textarea');
+            ta.value = id;
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); } catch (e) {}
+            document.body.removeChild(ta);
+            done();
+        }
+    }
+
+    // Render ulang isi dropdown mengikuti kata kunci pencarian + filter tier
+    function renderModelDrop() {
+        var box = document.getElementById('model-list');
+        var search = document.getElementById('model-search');
+        var tierSel = document.getElementById('model-tier');
+        var q = (search ? search.value : '').toLowerCase().trim();
+        var tier = tierSel ? tierSel.value : 'all';
+        var n = 0;
+        box.innerHTML = '';
+        availableModels.forEach(function (m) {
+            var t = m.tier || 'unknown';
+            if (tier !== 'all' && t !== tier) return;
+            if (q && String(m.id).toLowerCase().indexOf(q) === -1) return;
+            n++;
+            var row = document.createElement('button');
+            row.type = 'button';
             row.className = 'model-item';
+            if (m.note) row.title = m.note;
             var badge = document.createElement('span');
-            badge.className = tier === 'free' ? 'badge-free' : (tier === 'paid' ? 'badge-paid' : 'badge-unknown');
-            badge.textContent = tier === 'free' ? 'GRATIS' : (tier === 'paid' ? 'BERBAYAR' : '?');
+            badge.className = t === 'free' ? 'badge-free' : (t === 'paid' ? 'badge-paid' : 'badge-unknown');
+            badge.textContent = t === 'free' ? 'GRATIS' : (t === 'paid' ? 'BERBAYAR' : '?');
             var code = document.createElement('code');
             code.textContent = m.id;
+            var cp = document.createElement('span');
+            cp.className = 'model-copy';
+            cp.innerHTML = '<i class="fa-regular fa-copy"></i>';
             row.appendChild(badge);
             row.appendChild(code);
             if (m.price) {
@@ -1134,17 +1260,67 @@
                 price.textContent = '$' + m.price.input + ' / $' + m.price.output + ' per 1jt token';
                 row.appendChild(price);
             }
-            if (m.note) row.title = m.note;
-            list.appendChild(row);
+            row.appendChild(cp);
+            row.addEventListener('click', function () { copyModelId(m.id); });
+            box.appendChild(row);
+        });
+        if (!n) {
+            var empty = document.createElement('p');
+            empty.className = 'model-empty';
+            empty.textContent = availableModels.length
+                ? 'Tidak ada model yang cocok dengan pencarian.'
+                : 'Belum ada model — tekan "Muat Daftar Model" dulu.';
+            box.appendChild(empty);
+        }
+    }
+
+    function renderModelList(models) {
+        availableModels = models || [];
+        var count = document.getElementById('model-count');
+        var free = 0, paid = 0, unknown = 0;
+        availableModels.forEach(function (m) {
+            var t = m.tier || 'unknown';
+            if (t === 'free') free++; else if (t === 'paid') paid++; else unknown++;
         });
         count.textContent = '🟢 ' + free + ' gratis • 🔴 ' + paid + ' berbayar' + (unknown ? ' • ⚪ ' + unknown + ' belum diketahui' : '');
+        var search = document.getElementById('model-search');
+        var tierSel = document.getElementById('model-tier');
+        if (search) search.value = '';
+        if (tierSel) tierSel.value = 'all';
+        renderModelDrop();
+        openModelDrop(true);
     }
+
+    var modelSearchInput = document.getElementById('model-search');
+    var modelTierSel = document.getElementById('model-tier');
+    if (modelSearchInput) {
+        modelSearchInput.addEventListener('focus', function () { if (availableModels.length) openModelDrop(true); });
+        modelSearchInput.addEventListener('input', function () {
+            if (!availableModels.length) return;
+            openModelDrop(true);
+            renderModelDrop();
+        });
+    }
+    if (modelTierSel) {
+        modelTierSel.addEventListener('change', function () {
+            if (!availableModels.length) return;
+            openModelDrop(true);
+            renderModelDrop();
+        });
+    }
+    // Klik di luar area pencarian model → tutup dropdown
+    document.addEventListener('click', function (e) {
+        var d = document.getElementById('model-drop');
+        if (d && !d.contains(e.target)) openModelDrop(false);
+    });
 
     document.getElementById('btn-model-list').addEventListener('click', function () {
         var count = document.getElementById('model-count');
         var key = document.getElementById('gemini-key').value.trim();
         var slug = document.getElementById('sync-mode').value === 'gemini' ? 'gemini' : 'manual';
         count.textContent = 'Memuat model…';
+        document.getElementById('model-list').innerHTML = '<p class="model-empty">Memuat daftar model…</p>';
+        openModelDrop(true);
 
         function go() {
             fetch('/api/ai/models/' + slug, {headers: {'Accept': 'application/json'}})
@@ -1155,9 +1331,15 @@
                         if (data.pricing_source) count.title = 'Sumber label: ' + data.pricing_source;
                     } else {
                         count.textContent = '✗ ' + (data.error || 'Gagal memuat daftar model.');
+                        document.getElementById('model-list').innerHTML =
+                            '<p class="model-empty">✗ ' + esc(data.error || 'Gagal memuat daftar model.') + '</p>';
                     }
                 })
-                .catch(function (e) { count.textContent = '✗ ' + e.message; });
+                .catch(function (e) {
+                    count.textContent = '✗ ' + e.message;
+                    document.getElementById('model-list').innerHTML =
+                        '<p class="model-empty">✗ ' + esc(e.message) + '</p>';
+                });
         }
 
         // Mode Gemini + kolom key terisi → simpan dulu supaya tidak "belum dikonfigurasi".
@@ -1180,4 +1362,5 @@
     renderChat();
     restoreCurrent();
 })();
+
 
