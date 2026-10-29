@@ -161,8 +161,10 @@
                     <option value="openai-compatible">openai-compatible (9Router, OpenRouter, dll.)</option>
                     <option value="gemini">gemini</option>
                 </select>
-                <label>Base URL (khusus openai-compatible)</label>
-                <input name="base_url" placeholder="https://instance-9router-kamu.up.railway.app/v1">
+                <div id="prov-base-wrap">
+                    <label>Base URL (khusus openai-compatible)</label>
+                    <input name="base_url" placeholder="https://instance-9router-kamu.up.railway.app/v1">
+                </div>
                 <label>API Key</label>
                 <input name="api_key" placeholder="sk-... / AIza... / AQ.Ab8...">
                 <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="is_default" style="width:auto"> Jadikan provider default</label>
@@ -285,6 +287,6 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('js/kuro.js') }}?v=20261029-3"></script>
+<script src="{{ asset('js/kuro.js') }}?v=20261029-4"></script>
 @endpush
 

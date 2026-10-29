@@ -188,6 +188,17 @@
     document.getElementById('btn-prov-close').addEventListener('click', function () { provModal.classList.remove('open'); });
     provModal.addEventListener('click', function (e) { if (e.target === this) provModal.classList.remove('open'); });
 
+    // Driver gemini tidak butuh Base URL — sembunyikan & kosongkan otomatis.
+    var provDriver = document.querySelector('#provider-form select[name="driver"]');
+    function applyProvDriver() {
+        var wrap = document.getElementById('prov-base-wrap');
+        var isGemini = provDriver.value === 'gemini';
+        wrap.style.display = isGemini ? 'none' : '';
+        if (isGemini) wrap.querySelector('input[name="base_url"]').value = '';
+    }
+    provDriver.addEventListener('change', applyProvDriver);
+    applyProvDriver();
+
     document.getElementById('provider-form').addEventListener('submit', function (e) {
         e.preventDefault();
         var f = e.target;
@@ -207,12 +218,17 @@
             if (r.ok) {
                 msg.textContent = '✔ Provider & API Key tersimpan.';
                 f.reset();
+                applyProvDriver();
                 loadProviders();
                 setTimeout(function () { provModal.classList.remove('open'); msg.textContent = ''; }, 900);
                 kuroThinking(false, 'Provider baru ditambahkan ✨');
             } else {
                 r.json().then(function (j) {
-                    msg.textContent = '✗ ' + (j.message || 'Gagal menyimpan provider.');
+                    var m = j.message || 'Gagal menyimpan provider.';
+                    if (m === 'Server Error') {
+                        m = 'Server error — kemungkinan tabel AI belum dibuat. Jalankan "php artisan migrate --force" di Railway (Command Shell), lalu simpan lagi.';
+                    }
+                    msg.textContent = '✗ ' + m;
                 }).catch(function () { msg.textContent = '✗ Gagal menyimpan provider.'; });
             }
         });

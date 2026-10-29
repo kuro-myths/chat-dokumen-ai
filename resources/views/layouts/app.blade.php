@@ -16,7 +16,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
 {{-- Style Kuro AI (public/css/kuro.css) — dimuat terakhir agar tidak tertimpa --}}
-<link rel="stylesheet" href="{{ asset('css/kuro.css') }}?v=20261029-3">
+<link rel="stylesheet" href="{{ asset('css/kuro.css') }}?v=20261029-4">
 
 @stack('styles')
 </head>

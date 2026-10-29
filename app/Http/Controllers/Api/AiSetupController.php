@@ -96,9 +96,17 @@ class AiSetupController extends Controller
                 'is_active' => true,
             ]);
         } catch (Throwable $e) {
+            $m = (string) $e->getMessage();
+            $tableMissing = str_contains($m, 'does not exist')
+                || str_contains($m, 'no such table')
+                || str_contains($m, '42S02')
+                || str_contains((string) $e->getCode(), '42S02');
+
             return response()->json([
                 'ok' => false,
-                'message' => 'Gagal menyimpan setup: '.$e->getMessage(),
+                'message' => $tableMissing
+                    ? 'Database belum punya tabel AI (ai_settings). Buka Railway → Command Shell, jalankan: php artisan migrate --force — lalu simpan lagi.'
+                    : 'Gagal menyimpan setup: '.$m,
             ], 500);
         }
 
@@ -174,8 +182,20 @@ class AiSetupController extends Controller
                     'model' => $existing->model ?? config('ai.providers.gemini.model', 'gemini-2.5-flash'),
                     'is_active' => true,
                 ]);
-            } catch (Throwable) {
-                // tabel belum dimigrasi — key teruji valid, simpan bisa menyusul
+            } catch (Throwable $e) {
+                // Tabel belum dimigrasi -> jangan bilang sukses, supaya user tahu harus migrate.
+                $m = (string) $e->getMessage();
+                $tableMissing = str_contains($m, 'does not exist')
+                    || str_contains($m, 'no such table')
+                    || str_contains($m, '42S02')
+                    || str_contains((string) $e->getCode(), '42S02');
+
+                return response()->json([
+                    'ok' => false,
+                    'message' => $tableMissing
+                        ? 'Key kamu VALID di Google — tapi GAGAL disimpan karena tabel ai_settings belum ada. Jalankan: php artisan migrate --force di Railway (Command Shell), lalu tekan tombol ini lagi.'
+                        : 'Key VALID, tapi gagal disimpan: '.$m,
+                ]);
             }
 
             return response()->json([
