@@ -16,7 +16,11 @@ use Illuminate\Support\Str;
  */
 class ThesisReviewService
 {
-    public function review(Document $document, ?string $provider = null): array
+    /**
+     * $provider & $model berasal dari dropdown di composer (null = default
+     * provider) — semua model di dropdown bisa dipakai untuk analisis ini.
+     */
+    public function review(Document $document, ?string $provider = null, ?string $model = null): array
     {
         $sections = $document->sections()->orderBy('index')->get()->values();
 
@@ -41,6 +45,7 @@ class ThesisReviewService
                 ],
                 [
                     'json' => true,
+                    'model' => $model, // model terpilih di dropdown (null = default provider)
                     'temperature' => $config['temperature'],
                     'timeout' => $config['timeout'],
                 ],

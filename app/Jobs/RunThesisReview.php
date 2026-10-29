@@ -23,11 +23,12 @@ class RunThesisReview implements ShouldQueue
     public function __construct(
         public Document $document,
         public ?string $provider = null,
+        public ?string $model = null,
     ) {}
 
     public function handle(ThesisReviewService $service): void
     {
-        $service->review($this->document, $this->provider);
+        $service->review($this->document, $this->provider, $this->model);
     }
 
     public function failed(Throwable $e): void

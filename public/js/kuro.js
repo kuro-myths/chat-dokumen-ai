@@ -1140,7 +1140,10 @@
                 'Accept': 'application/json',
                 'X-CSRF-TOKEN': CSRF
             },
-            body: JSON.stringify({provider: currentProvider})
+            body: JSON.stringify({
+                provider: currentProvider,
+                model: currentModel // model terpilih di dropdown (null = default provider)
+            })
         }).then(function (r) { return r.json(); }).then(function () {
             loadDocs();
             pollReview(id);

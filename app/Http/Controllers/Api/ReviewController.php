@@ -14,10 +14,13 @@ class ReviewController extends Controller
     /** Jadwalkan review AI via queue (disarankan untuk skripsi penuh). */
     public function store(Request $request, Document $document): JsonResponse
     {
-        $request->validate(['provider' => ['nullable', 'string', 'max:60']]);
+        $request->validate([
+            'provider' => ['nullable', 'string', 'max:60'],
+            'model' => ['nullable', 'string', 'max:120'],
+        ]);
 
         $document->update(['status' => 'reviewing']);
-        RunThesisReview::dispatch($document, $request->input('provider'));
+        RunThesisReview::dispatch($document, $request->input('provider'), $request->input('model'));
 
         return response()->json([
             'message' => 'Review AI dijadwalkan. Cek status di /api/documents/{id}/review.',
@@ -38,7 +41,7 @@ class ReviewController extends Controller
     /** Review sinkron — untuk dokumen pendek / testing. */
     public function sync(Request $request, Document $document, ThesisReviewService $service): JsonResponse
     {
-        $summary = $service->review($document, $request->input('provider'));
+        $summary = $service->review($document, $request->input('provider'), $request->input('model'));
 
         return response()->json(['message' => 'Review selesai.', 'summary' => $summary]);
     }
