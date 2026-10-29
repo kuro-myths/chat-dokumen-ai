@@ -17,7 +17,11 @@ class AiModelService
     protected const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
     /**
-     * Daftar semua provider (config + database) TANPA memanggil API eksternal.
+     * Daftar provider yang benar-benar siap dipakai (config yang sudah
+     * dikonfigurasi + database) TANPA memanggil API eksternal.
+     *
+     * Provider tanpa API key / base URL (titik merah di UI) disembunyikan
+     * dari daftar — otomatis tampil kembali begitu env / API key-nya diisi.
      *
      * @return list<array{slug: string, name: string, driver: string, base_url: ?string, model: ?string, configured: bool, source: string, is_default: bool}>
      */
@@ -26,13 +30,19 @@ class AiModelService
         $providers = [];
 
         foreach (config('ai.providers', []) as $slug => $config) {
+            // Provider config tanpa API key / base URL tidak ditampilkan
+            // (muncul otomatis lagi setelah env-nya diisi di server).
+            if (! $this->isConfigured($config)) {
+                continue;
+            }
+
             $providers[$slug] = [
                 'slug' => $slug,
                 'name' => ucfirst($slug),
                 'driver' => $config['driver'] ?? 'openai-compatible',
                 'base_url' => $config['base_url'] ?? null,
                 'model' => $config['model'] ?? null,
-                'configured' => $this->isConfigured($config),
+                'configured' => true,
                 'source' => 'config',
                 'is_default' => false,
             ];
@@ -41,13 +51,18 @@ class AiModelService
         // Provider dari database (ditambah via beranda / /api/ai/providers) menimpa config.
         try {
             foreach (AiSetting::where('is_active', true)->get() as $setting) {
+                // Baris database tanpa API key / base URL juga disembunyikan.
+                if (! $this->isConfigured($setting->config())) {
+                    continue;
+                }
+
                 $providers[$setting->slug] = [
                     'slug' => $setting->slug,
                     'name' => $setting->name,
                     'driver' => $setting->driver,
                     'base_url' => $setting->base_url,
                     'model' => $setting->model,
-                    'configured' => $this->isConfigured($setting->config()),
+                    'configured' => true,
                     'source' => 'database',
                     'is_default' => $setting->is_default,
                 ];
@@ -75,7 +90,49 @@ class AiModelService
             $slug = null;
         }
 
-        return $slug ?? config('ai.default');
+        if (is_string($slug) && $slug !== '') {
+            return $slug;
+        }
+
+        $usable = $this->usableSlugs();
+        $fallback = config('ai.default');
+
+        // Default dari config yang belum dikonfigurasi (titik merah) jangan
+        // dikembalikan — pakai provider pertama yang benar-benar siap dipakai.
+        if (is_string($fallback) && $fallback !== '' && isset($usable[$fallback])) {
+            return $fallback;
+        }
+
+        return array_key_first($usable);
+    }
+
+    /**
+     * Slug semua provider yang benar-benar siap dipakai: config yang sudah
+     * dikonfigurasi + baris ai_settings yang sudah dikonfigurasi.
+     *
+     * @return array<string, true>
+     */
+    protected function usableSlugs(): array
+    {
+        $slugs = [];
+
+        foreach (config('ai.providers', []) as $slug => $config) {
+            if ($this->isConfigured($config)) {
+                $slugs[$slug] = true;
+            }
+        }
+
+        try {
+            foreach (AiSetting::where('is_active', true)->get() as $setting) {
+                if ($this->isConfigured($setting->config())) {
+                    $slugs[$setting->slug] = true;
+                }
+            }
+        } catch (Throwable) {
+            // tabel belum dimigrasi — abaikan
+        }
+
+        return $slugs;
     }
 
     /**
