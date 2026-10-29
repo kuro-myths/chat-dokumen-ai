@@ -3,169 +3,190 @@
 @section('title', 'Beranda — Kuro AI')
 
 @section('content')
-<div class="wrap">
-    {{-- ===== Topbar ===== --}}
-    <div class="topbar">
+<div class="shell">
+    {{-- ===== Sidebar ala Gemini ===== --}}
+    <aside class="sidebar">
         <div class="brand">
             <div class="logo" aria-hidden="true">
-                <svg viewBox="0 0 64 64" width="24" height="24">
-                    <path d="M12 18c0-4 3-6 6-6h20c4 0 6 3 6 6v13c0 4-3 6-7 6H27l-7 7v-7c-4 0-8-3-8-7z" fill="#0d1226"/>
-                    <text x="28" y="31" font-family="Arial" font-size="16" font-weight="bold" fill="#0d1226" text-anchor="middle">K</text>
+                <svg viewBox="0 0 64 64" width="22" height="22">
+                    <path d="M12 18c0-4 3-6 6-6h20c4 0 6 3 6 6v13c0 4-3 6-7 6H27l-7 7v-7c-4 0-8-3-8-7z" fill="#6d5efc"/>
+                    <text x="28" y="34" font-family="Arial" font-size="16" font-weight="bold" fill="#ffffff" text-anchor="middle">K</text>
                 </svg>
             </div>
-            <div>Kuro AI <span class="sub">Voice · Model · Dokumen</span></div>
+            <div class="brand-txt">Kuro AI<small>Asisten skripsi &amp; proposal</small></div>
         </div>
-        <div class="navbtns">
-            <button class="btn ghost icon" id="btn-history" title="Riwayat percakapan tersimpan">
-                <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path d="M13 3a9 9 0 0 0-9 9H1l3.9 3.9.1.1 4-4H6a7 7 0 1 1 2.1 5L6.7 18.4A9 9 0 1 0 13 3zm-1 5v5l4.3 2.5.7-1.2-3.5-2.1V8z"/></svg>
-            </button>
-            <button class="btn ghost icon" id="btn-save-chat" title="Simpan percakapan ini">
-                <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zM12 19a3 3 0 1 1 0-6 3 3 0 0 1 0 6zM6 6h9v4H6z"/></svg>
-            </button>
+
+        <button class="new-chat" id="btn-new-chat">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg>
+            Percakapan baru
+        </button>
+
+        <nav style="display:flex;flex-direction:column;gap:2px">
+            <button class="side-item" data-goto="chat"><span class="ic">💬</span> Percakapan &amp; Dikte</button>
+            <button class="side-item" id="btn-history"><span class="ic">🕘</span> Riwayat tersimpan</button>
+            <button class="side-item" data-goto="dokumen"><span class="ic">📄</span> Periksa dokumen</button>
+            <button class="side-item" data-goto="integrasi"><span class="ic">🧠</span> Integrasi &amp; Model</button>
+            <button class="side-item" data-goto="tambah"><span class="ic">➕</span> Tambah provider</button>
+        </nav>
+
+        <div class="side-stats">
+            <div class="sstat"><span>Dokumen</span><b>{{ $stats['documents'] ?? '—' }}</b></div>
+            <div class="sstat"><span>Temuan AI (pending)</span><b>{{ $stats['highlights'] ?? '—' }}</b></div>
+            <div class="sstat"><span>Komentar</span><b>{{ $stats['comments'] ?? '—' }}</b></div>
+            <div class="sstat"><span>Provider AI</span><b id="stat-providers">…</b></div>
+        </div>
+
+        <div class="side-foot">
             <form method="POST" action="/logout">
                 @csrf
-                <button type="submit" class="btn ghost">Keluar</button>
+                <button type="submit" class="side-item"><span class="ic">🚪</span> Keluar</button>
             </form>
         </div>
-    </div>
+    </aside>
 
-    {{-- ===== Statistik ===== --}}
-    <div class="stats">
-        <div class="stat"><span class="muted">Dokumen</span><b>{{ $stats['documents'] ?? '—' }}</b></div>
-        <div class="stat"><span class="muted">Temuan AI (pending)</span><b>{{ $stats['highlights'] ?? '—' }}</b></div>
-        <div class="stat"><span class="muted">Komentar</span><b>{{ $stats['comments'] ?? '—' }}</b></div>
-        <div class="stat"><span class="muted">Provider AI</span><b id="stat-providers">…</b></div>
-    </div>
-
-    {{-- ===== Fitur unggulan ===== --}}
-    <div class="features">
-        <div class="feature" data-goto="chat">
-            <div class="glow" style="background:#6d5efc"></div>
-            <span class="ficon">🎙️</span>
-            <b>Voice Suara</b>
-            <p>Dikte langsung dengan suara — hasil transkripsi otomatis masuk ke percakapan. Kuro mendengarkan untukmu.</p>
-        </div>
-        <div class="feature" data-goto="integrasi">
-            <div class="glow" style="background:#22d3ee"></div>
-            <span class="ficon">🧠</span>
-            <b>Cek Model</b>
-            <p>Lihat daftar model AI tiap provider — Gemini, 9Router online, atau API kompatibel OpenAI lain.</p>
-        </div>
-        <div class="feature" data-goto="dokumen">
-            <div class="glow" style="background:#34d399"></div>
-            <span class="ficon">📄</span>
-            <b>Periksa Dokumen</b>
-            <p>Unggah skripsi/proposal .docx — AI memberi highlight warna, komentar, dan saran revisi.</p>
-        </div>
-    </div>
-
-    {{-- ===== Integrasi AI ===== --}}
-    <div class="card" id="integrasi">
-        <h2>🧠 Integrasi AI &amp; Cek Model</h2>
-        <p class="muted">
-            <b>Gemini</b> (driver <code>gemini</code>) dan <b>multi-API</b> seperti 9Router online
-            (driver <code>openai-compatible</code>). Klik <b>Lihat Model</b> untuk menampilkan daftar model.
-        </p>
-        <div class="grid" id="providers"><p class="muted">Memuat provider…</p></div>
-    </div>
-
-    {{-- ===== Chat + Voice ===== --}}
-    <div class="card" style="margin-top:22px" id="chat">
-        <h2>💬 Percakapan &amp; Dikte Suara</h2>
-        <p class="muted">Ngobrol dengan Kuro — tekan ikon mic untuk mendikte dengan suara (bahasa Indonesia).</p>
-        <label for="chat-provider">Provider</label>
-        <select id="chat-provider"><option value="">(memuat…)</option></select>
-        <div class="chat-log" id="chat-log"></div>
-        <textarea id="chat-input" rows="2" placeholder="Tulis pesan atau tekan mic, lalu Ctrl+Enter untuk kirim…"></textarea>
-        <div class="chat-tools">
-            <button class="btn" id="chat-send">
-                <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
-                Kirim
-            </button>
-            <button class="btn ghost icon" id="btn-mic" title="Dikte suara">
-                <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3z"/><path d="M19 11a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.92V20H8a1 1 0 1 0 0 2h8a1 1 0 1 0 0-2h-3v-2.08A7 7 0 0 0 19 11z"/></svg>
-            </button>
-            <button class="btn ghost small" id="btn-clear-chat">Kosongkan</button>
-            <span class="muted" id="chat-status" style="font-size:.78rem"></span>
-        </div>
-    </div>
-
-    {{-- ===== Periksa dokumen ===== --}}
-    <div class="card" style="margin-top:22px" id="dokumen">
-        <h2>📄 Periksa Dokumen</h2>
-        <p class="muted">Unggah .docx skripsi/proposal → AI menganalisis bahasa, sitasi, metodologi &amp; struktur → unduh hasil dengan highlight warna.</p>
-        <div class="dropzone" id="dropzone">
-            <p style="font-size:1.6rem;margin:0">📥</p>
-            <p><b>Klik atau tarik file .docx ke sini</b></p>
-            <p>Analisis dilakukan oleh provider AI terpilih</p>
-            <input type="file" id="doc-file" accept=".docx" style="display:none">
-        </div>
-        <div class="row" style="margin-top:14px">
-            <div style="flex:1;min-width:170px">
-                <label>Jenis</label>
-                <select id="doc-type"><option value="skripsi">Skripsi</option><option value="proposal">Proposal</option></select>
+    {{-- ===== Konten utama ===== --}}
+    <main class="main">
+        <div class="main-inner">
+            <div class="topbar">
+                <h1 class="greet">Sebaiknya kita mulai dari mana?</h1>
             </div>
-            <div style="flex:2;min-width:220px">
-                <label>Judul (opsional)</label>
-                <input id="doc-title" placeholder="Otomatis dari nama file">
-            </div>
-            <div style="flex:1;min-width:170px;display:flex;align-items:flex-end">
-                <button class="btn" id="doc-upload" style="width:100%;justify-content:center">
-                    <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M19 13v6H5v-6H3v8h18v-8zM11 5.8 8.4 8.4 7 7l5-5 5 5-1.4 1.4L13 5.8V16h-2z"/></svg>
-                    Unggah
+
+            {{-- Kartu pintasan ala Gemini --}}
+            <div class="quick">
+                <button class="q-card" data-goto="dokumen">
+                    <span class="q-ic">📄</span>
+                    <b>Periksa dokumen</b>
+                    <p>Unggah .docx → AI memberi highlight &amp; saran revisi.</p>
+                </button>
+                <button class="q-card" data-act="mic">
+                    <span class="q-ic">🎙️</span>
+                    <b>Dikte suara</b>
+                    <p>Bicara dalam bahasa Indonesia, Kuro menuliskannya.</p>
+                </button>
+                <button class="q-card" data-goto="integrasi">
+                    <span class="q-ic">🧠</span>
+                    <b>Cek model</b>
+                    <p>Lihat model AI tiap provider sebelum dipakai.</p>
+                </button>
+                <button class="q-card" data-act="chat">
+                    <span class="q-ic">💬</span>
+                    <b>Tanya Kuro</b>
+                    <p>Ngobrol soal skripsi, sitasi, atau metodologi.</p>
                 </button>
             </div>
-        </div>
-        <p class="hint">Setelah unggah, tekan <b>Periksa AI</b> pada dokumen. Untuk dokumen panjang, jalankan <code>php artisan queue:work</code> di terminal kedua.</p>
-        <div id="doc-list"></div>
-        <div id="doc-findings"></div>
-    </div>
 
-    {{-- ===== Tambah provider ===== --}}
-    <div class="card" style="margin-top:22px;margin-bottom:40px">
-        <h2>➕ Tambah Provider</h2>
-        <p class="muted">
-            Contoh 9Router online: driver <b>openai-compatible</b>,
-            base URL <code>https://instance-9router-kamu.up.railway.app/v1</code>, API key dari dashboard 9Router,
-            model bebas (mis. <code>gpt-4o-mini</code>).
-        </p>
-        <form id="provider-form" class="row" style="margin-top:8px">
-            <div style="flex:1;min-width:150px">
-                <label>Slug</label>
-                <input name="slug" placeholder="9router" pattern="[A-Za-z0-9_-]+" required>
+            {{-- ===== Percakapan + dikte suara ===== --}}
+            <div class="card" id="chat" style="margin-top:26px">
+                <h2>💬 Percakapan &amp; Dikte Suara</h2>
+                <p class="muted">Ngobrol dengan Kuro — tekan ikon mic untuk mendikte dengan suara (bahasa Indonesia).</p>
+                <label for="chat-provider">Provider</label>
+                <select id="chat-provider"><option value="">(memuat…)</option></select>
+                <div class="chat-log" id="chat-log"></div>
+                <textarea id="chat-input" rows="2" placeholder="Tulis pesan atau tekan mic, lalu Ctrl+Enter untuk kirim…"></textarea>
+                <div class="chat-tools">
+                    <button class="btn" id="chat-send">
+                        <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
+                        Kirim
+                    </button>
+                    <button class="btn ghost icon" id="btn-mic" title="Dikte suara">
+                        <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3z"/><path d="M19 11a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.92V20H8a1 1 0 1 0 0 2h8a1 1 0 1 0 0-2h-3v-2.08A7 7 0 0 0 19 11z"/></svg>
+                    </button>
+                    <button class="btn ghost icon" id="btn-save-chat" title="Simpan percakapan ini">
+                        <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zM12 19a3 3 0 1 1 0-6 3 3 0 0 1 0 6zM6 6h9v4H6z"/></svg>
+                    </button>
+                    <button class="btn ghost small" id="btn-clear-chat">Kosongkan</button>
+                    <span class="muted" id="chat-status" style="font-size:.78rem"></span>
+                </div>
             </div>
-            <div style="flex:1;min-width:150px">
-                <label>Nama</label>
-                <input name="name" placeholder="9Router Online" required>
+
+            {{-- ===== Periksa dokumen ===== --}}
+            <div class="card" id="dokumen">
+                <h2>📄 Periksa Dokumen</h2>
+                <p class="muted">Unggah .docx skripsi/proposal → AI menganalisis bahasa, sitasi, metodologi &amp; struktur → unduh hasil dengan highlight warna.</p>
+                <div class="dropzone" id="dropzone">
+                    <p style="font-size:1.6rem;margin:0">📥</p>
+                    <p><b>Klik atau tarik file .docx ke sini</b></p>
+                    <p>Analisis dilakukan oleh provider AI terpilih</p>
+                    <input type="file" id="doc-file" accept=".docx" style="display:none">
+                </div>
+                <div class="row" style="margin-top:14px">
+                    <div style="flex:1;min-width:170px">
+                        <label>Jenis</label>
+                        <select id="doc-type"><option value="skripsi">Skripsi</option><option value="proposal">Proposal</option></select>
+                    </div>
+                    <div style="flex:2;min-width:220px">
+                        <label>Judul (opsional)</label>
+                        <input id="doc-title" placeholder="Otomatis dari nama file">
+                    </div>
+                    <div style="flex:1;min-width:170px;display:flex;align-items:flex-end">
+                        <button class="btn" id="doc-upload" style="width:100%;justify-content:center">
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M19 13v6H5v-6H3v8h18v-8zM11 5.8 8.4 8.4 7 7l5-5 5 5-1.4 1.4L13 5.8V16h-2z"/></svg>
+                            Unggah
+                        </button>
+                    </div>
+                </div>
+                <p class="hint">Setelah unggah, tekan <b>Periksa AI</b> pada dokumen. Untuk dokumen panjang, jalankan <code>php artisan queue:work</code> di terminal kedua.</p>
+                <div id="doc-list"></div>
+                <div id="doc-findings"></div>
             </div>
-            <div style="flex:1;min-width:150px">
-                <label>Driver</label>
-                <select name="driver">
-                    <option value="openai-compatible">openai-compatible (9Router, OpenRouter, dll.)</option>
-                    <option value="gemini">gemini</option>
-                </select>
+
+            {{-- ===== Integrasi AI & cek model ===== --}}
+            <div class="card" id="integrasi">
+                <h2>🧠 Integrasi AI &amp; Cek Model</h2>
+                <p class="muted">
+                    <b>Gemini</b> (driver <code>gemini</code>) dan <b>multi-API</b> seperti 9Router online
+                    (driver <code>openai-compatible</code>). Klik <b>Lihat Model</b> untuk menampilkan daftar model.
+                </p>
+                <div class="grid" id="providers"><p class="muted">Memuat provider…</p></div>
             </div>
-            <div style="flex:2;min-width:220px">
-                <label>Base URL</label>
-                <input name="base_url" placeholder="https://instance-9router-kamu.up.railway.app/v1">
+
+            {{-- ===== Tambah provider ===== --}}
+            <div class="card" id="tambah" style="margin-bottom:40px">
+                <h2>➕ Tambah Provider</h2>
+                <p class="muted">
+                    Contoh 9Router online: driver <b>openai-compatible</b>,
+                    base URL <code>https://instance-9router-kamu.up.railway.app/v1</code>, API key dari dashboard 9Router,
+                    model bebas (mis. <code>gpt-4o-mini</code>).
+                </p>
+                <form id="provider-form" class="row" style="margin-top:8px">
+                    <div style="flex:1;min-width:150px">
+                        <label>Slug</label>
+                        <input name="slug" placeholder="9router" pattern="[A-Za-z0-9_-]+" required>
+                    </div>
+                    <div style="flex:1;min-width:150px">
+                        <label>Nama</label>
+                        <input name="name" placeholder="9Router Online" required>
+                    </div>
+                    <div style="flex:1;min-width:150px">
+                        <label>Driver</label>
+                        <select name="driver">
+                            <option value="openai-compatible">openai-compatible (9Router, OpenRouter, dll.)</option>
+                            <option value="gemini">gemini</option>
+                        </select>
+                    </div>
+                    <div style="flex:2;min-width:220px">
+                        <label>Base URL</label>
+                        <input name="base_url" placeholder="https://instance-9router-kamu.up.railway.app/v1">
+                    </div>
+                    <div style="flex:1;min-width:150px">
+                        <label>Model</label>
+                        <input name="model" placeholder="gpt-4o-mini">
+                    </div>
+                    <div style="flex:2;min-width:220px">
+                        <label>API Key</label>
+                        <input name="api_key" placeholder="sk-...">
+                    </div>
+                    <div style="flex:1;min-width:150px;display:flex;align-items:flex-end">
+                        <label style="margin:0 6px 0 0"><input type="checkbox" name="is_default" style="width:auto"> Jadikan default</label>
+                    </div>
+                    <div style="flex:1;min-width:150px;display:flex;align-items:flex-end">
+                        <button type="submit" class="btn" style="width:100%;justify-content:center">Simpan</button>
+                    </div>
+                </form>
+                <p id="provider-msg" class="hint"></p>
             </div>
-            <div style="flex:1;min-width:150px">
-                <label>Model</label>
-                <input name="model" placeholder="gpt-4o-mini">
-            </div>
-            <div style="flex:2;min-width:220px">
-                <label>API Key</label>
-                <input name="api_key" placeholder="sk-...">
-            </div>
-            <div style="flex:1;min-width:150px;display:flex;align-items:flex-end">
-                <label style="margin:0 6px 0 0"><input type="checkbox" name="is_default" style="width:auto"> Jadikan default</label>
-            </div>
-            <div style="flex:1;min-width:150px;display:flex;align-items:flex-end">
-                <button type="submit" class="btn" style="width:100%;justify-content:center">Simpan</button>
-            </div>
-        </form>
-        <p id="provider-msg" class="hint"></p>
-    </div>
+        </div>
+    </main>
 </div>
 
 {{-- ===== Maskot Kuro ===== --}}
@@ -173,14 +194,14 @@
     <div class="kuro-bubble" id="kuro-bubble">Kuro siap membantu ✨</div>
     <svg class="kuro-svg" viewBox="0 0 120 112" width="110" aria-hidden="true">
         <g>
-            <path d="M30 48 L20 16 L48 36 Z" fill="#151d38" stroke="#2b3a6b" stroke-width="2"/>
-            <path d="M90 48 L100 16 L72 36 Z" fill="#151d38" stroke="#2b3a6b" stroke-width="2"/>
-            <ellipse cx="60" cy="64" rx="42" ry="40" fill="#151d38" stroke="#2b3a6b" stroke-width="2"/>
-            <ellipse class="kuro-eye" cx="46" cy="60" rx="7" ry="9" fill="#22d3ee"/>
-            <ellipse class="kuro-eye" cx="74" cy="60" rx="7" ry="9" fill="#22d3ee"/>
-            <path d="M52 79 Q60 87 68 79" stroke="#22d3ee" stroke-width="3" fill="none" stroke-linecap="round"/>
-            <path d="M22 66 L36 68 M22 76 L36 75" stroke="#2b3a6b" stroke-width="2" stroke-linecap="round"/>
-            <path d="M98 66 L84 68 M98 76 L84 75" stroke="#2b3a6b" stroke-width="2" stroke-linecap="round"/>
+            <path d="M30 48 L20 16 L48 36 Z" fill="#d9cff0" stroke="#c8b9e8" stroke-width="2"/>
+            <path d="M90 48 L100 16 L72 36 Z" fill="#d9cff0" stroke="#c8b9e8" stroke-width="2"/>
+            <ellipse cx="60" cy="64" rx="42" ry="40" fill="#ede8fe" stroke="#c8b9e8" stroke-width="2"/>
+            <ellipse class="kuro-eye" cx="46" cy="60" rx="7" ry="9" fill="#6d5efc"/>
+            <ellipse class="kuro-eye" cx="74" cy="60" rx="7" ry="9" fill="#6d5efc"/>
+            <path d="M52 79 Q60 87 68 79" stroke="#6d5efc" stroke-width="3" fill="none" stroke-linecap="round"/>
+            <path d="M22 66 L36 68 M22 76 L36 75" stroke="#c8b9e8" stroke-width="2" stroke-linecap="round"/>
+            <path d="M98 66 L84 68 M98 76 L84 75" stroke="#c8b9e8" stroke-width="2" stroke-linecap="round"/>
         </g>
     </svg>
     <div class="kuro-scan"></div>
@@ -229,12 +250,26 @@
         }
     }
 
-    // ---------- Fitur card ----------
-    document.querySelectorAll('.feature').forEach(function (f) {
-        f.addEventListener('click', function () {
-            var t = document.getElementById(f.getAttribute('data-goto'));
+    // ---------- Navigasi sidebar & kartu pintasan ----------
+    document.querySelectorAll('[data-goto]').forEach(function (el) {
+        el.addEventListener('click', function () {
+            var t = document.getElementById(el.getAttribute('data-goto'));
             if (t) t.scrollIntoView({behavior: 'smooth'});
-            if (f.getAttribute('data-goto') === 'chat') document.getElementById('chat-input').focus();
+            if (el.getAttribute('data-goto') === 'chat') document.getElementById('chat-input').focus();
+        });
+    });
+    document.querySelectorAll('[data-act]').forEach(function (el) {
+        el.addEventListener('click', function () {
+            var act = el.getAttribute('data-act');
+            document.getElementById('chat').scrollIntoView({behavior: 'smooth'});
+            if (act === 'mic') document.getElementById('btn-mic').click();
+            else document.getElementById('chat-input').focus();
+        });
+    });
+    document.querySelectorAll('.side-item').forEach(function (b) {
+        b.addEventListener('click', function () {
+            document.querySelectorAll('.side-item').forEach(function (x) { x.classList.remove('active'); });
+            b.classList.add('active');
         });
     });
 
@@ -287,7 +322,7 @@
         });
 
         if (!data.providers.length) {
-            box.innerHTML = '<p class="muted">Belum ada provider — tambahkan lewat form di bawah.</p>';
+            box.innerHTML = '<p class="muted">Belum ada provider — tambahkan lewat form "Tambah Provider".</p>';
         }
     }
 
@@ -348,12 +383,20 @@
         });
     }
 
-    // ---------- Chat + history ----------
+    // ---------- Chat + riwayat ----------
     var history = [];
     var chatLog = document.getElementById('chat-log');
 
     function renderChat() {
         chatLog.innerHTML = '';
+        if (!history.length) {
+            var empty = document.createElement('div');
+            empty.className = 'chat-empty';
+            empty.innerHTML = 'Halo! Saya <b>Kuro</b> 🐾 asisten akademikmu.<br>' +
+                'Tulis pesan di bawah, atau tekan tombol mic untuk mendikte dengan suara.';
+            chatLog.appendChild(empty);
+            return;
+        }
         history.forEach(function (m) {
             var div = document.createElement('div');
             div.className = 'msg ' + (m.role === 'user' ? 'user' : 'ai');
@@ -440,6 +483,14 @@
         history = [];
         renderChat();
         saveCurrent();
+    });
+    document.getElementById('btn-new-chat').addEventListener('click', function () {
+        history = [];
+        renderChat();
+        saveCurrent();
+        document.getElementById('chat').scrollIntoView({behavior: 'smooth'});
+        document.getElementById('chat-input').focus();
+        kuroThinking(false, 'Percakapan baru dimulai ✨');
     });
 
     // ---------- Dikte suara ----------
@@ -753,6 +804,7 @@
     // ---------- Init ----------
     loadProviders();
     loadDocs();
+    renderChat();
     restoreCurrent();
 })();
 </script>

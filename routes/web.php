@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| Halaman web SkripsiAI
+| Halaman web Kuro AI
 |--------------------------------------------------------------------------
 | Menggantikan halaman welcome default Laravel ("/" tidak lagi menampilkan
 | "Let's get started"). "/" kini menjadi halaman BERANDA yang dilindungi

@@ -1,6 +1,6 @@
 # Kuro AI — AI Reviewer Skripsi & Proposal (Laravel 12+)
 
-**Kuro AI** membantu mahasiswa menyusun skripsi/proposal: AI menganalisis dokumen DOCX, memberi **highlight warna** pada teks bermasalah, memberi **komentar + saran revisi**, dan menerima **input suara otomatis**. Beranda modern dilengkapi **maskot Kuro melayang** dengan animasi saat menganalisis.
+**Kuro AI** membantu mahasiswa menyusun skripsi/proposal: AI menganalisis dokumen DOCX, memberi **highlight warna** pada teks bermasalah, memberi **komentar + saran revisi**, dan menerima **input suara otomatis**. Beranda terang ala Gemini (sidebar ungu muda + konten putih) dilengkapi **maskot Kuro melayang** dengan animasi saat menganalisis.
 
 Integrasi AI cukup **2 driver**:
 - **`gemini`** — Google Gemini (cukup `GEMINI_API_KEY`).
@@ -13,9 +13,9 @@ Integrasi AI cukup **2 driver**:
 | 🎙️ **Voice suara** | Dikte langsung ke percakapan lewat mic (Speech Recognition, `id-ID`) — plus auto voice input untuk dokumen: rekam → berhenti otomatis saat diam → transkripsi Whisper-compatible → dirapikan ke bahasa akademik oleh LLM → masuk paragraf |
 | 🧠 **Cek model** | Tombol **Lihat Model** di beranda & `GET /api/ai/models` menampilkan daftar model tiap provider (Gemini `models/`, openai-compatible `/models`) |
 | 📄 **Periksa dokumen** | Unggah `.docx` dari beranda (drag & drop) → AI menganalisis bahasa, sitasi, metodologi, struktur BAB I–V → highlight warna + komentar + unduh DOCX berwarna + laporan review |
-| 💬 **Riwayat percakapan** | Ikon 💾 menyimpan percakapan, ikon 🕘 membuka riwayat (muat/hapus) — tersimpan di browser; percakapan aktif auto-restore |
+| 💬 **Riwayat percakapan** | Ikon 💾 menyimpan percakapan, tombol **Riwayat tersimpan** membuka riwayat (muat/hapus) — tersimpan di browser; percakapan aktif auto-restore |
 | 🐾 **Maskot Kuro** | Kucing Kuro melayang (animasi CSS) — berkedip & memunculkan cincin scan saat menganalisis ("Kuro sedang menganalisis…") |
-| 🔐 **Halaman masuk + beranda** | Welcome default Laravel **diganti**: `/login` password default **123456789** (ubah via `APP_LOGIN_PASSWORD`), `/` beranda dark modern (font Plus Jakarta Sans via CDN, favicon bubble-K) |
+| 🔐 **Halaman masuk + beranda** | Welcome default Laravel **diganti**: `/login` password default **123456789** (ubah via `APP_LOGIN_PASSWORD`), `/` beranda terang ala Gemini — sidebar ungu muda + konten putih (font Plus Jakarta Sans via CDN, favicon bubble-K ungu) |
 | DOCX | Parse per paragraf (deteksi BAB/sub-bab) → ekspor `.docx` dengan warna highlight + lampiran Laporan Review AI (phpoffice/phpword) |
 | Tanda warna | merah = bahasa/typo/plagiarisme, kuning = tanpa sitasi, biru = metodologi, ungu = struktur, hijau = gaya akademik |
 | Perbaikan revisi | `POST /highlights/{id}/accept` mengganti teks asli dengan `replacement`, snapshot versi otomatis, plus `accept-all` |
@@ -29,7 +29,7 @@ Route `routes/web.php` menggantikan halaman welcome bawaan Laravel:
 | --- | --- | --- |
 | GET | `/login` | Halaman masuk (password default `123456789`) |
 | POST | `/login` · `/logout` | Proses masuk / keluar (sesi) |
-| GET | `/` | **Beranda**: statistik, kartu fitur unggulan, integrasi AI + Lihat Model, percakapan + dikte suara + riwayat tersimpan, panel periksa dokumen (unggah → review → temuan → unduh), form tambah provider, maskot Kuro |
+| GET | `/` | **Beranda** ala Gemini: sidebar (percakapan baru, riwayat, navigasi, statistik), kartu pintasan, percakapan + dikte suara + riwayat tersimpan, panel periksa dokumen (unggah → review → temuan → unduh), integrasi AI + Lihat Model, form tambah provider, maskot Kuro |
 | GET | `/models` · `/models/{slug}` | (AJAX, butuh login) daftar provider / daftar model satu provider |
 | POST | `/chat` | (AJAX, butuh login) percakapan ke provider mana pun |
 
@@ -158,12 +158,12 @@ app/Services/Review/
 └── RevisionService.php            # terima/tolak revisi
 app/Services/Voice/VoiceTranscriptionService.php
 app/Http/Controllers/Api/          # Document, Review, Highlight, Comment, Voice, Provider, Model
-app/Http/Controllers/Web/          # AuthController (login) + HomeController (beranda, model, chat)
+app/Http/Controllers/Web/         # AuthController (login) + HomeController (beranda, model, chat)
 app/Http/Requests/                # validasi upload
 app/Jobs/RunThesisReview.php
 app/Models/                       # Document, DocumentSection, DocumentVersion, Comment, Highlight, Transcription, AiSetting
 database/migrations/2026_10_28_000001_create_skripsi_ai_tables.php
-resources/views/                  # layouts/app (favicon bubble-K + font CDN), login, beranda
+resources/views/                  # layouts/app (tema terang ala Gemini + favicon bubble-K), login, beranda
 routes/api.php
 resources/js/voice-input.js        # auto-stop silence detection + auto insert
 ```
