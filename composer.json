@@ -1,8 +1,8 @@
 {
     "name": "kuro-myths/chat-dokumen-ai",
     "type": "project",
-    "description": "SkripsiAI — AI Reviewer Skripsi & Proposal (Laravel 12+). Integrasi AI: driver Gemini + multi-API kompatibel OpenAI (9Router, OpenRouter, dll.).",
-    "keywords": ["laravel", "ai", "docx", "skripsi", "reviewer", "gemini", "9router"],
+    "description": "Kuro AI — AI Reviewer Skripsi & Proposal (Laravel 12+). Integrasi AI: driver Gemini + multi-API kompatibel OpenAI (9Router, OpenRouter, dll.). Fitur: voice, cek model, periksa dokumen.",
+    "keywords": ["laravel", "ai", "docx", "skripsi", "reviewer", "gemini", "9router", "kuro"],
     "license": "MIT",
     "require": {
         "php": "^8.2",

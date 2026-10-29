@@ -13,8 +13,9 @@ use Illuminate\Http\Request;
 use Throwable;
 
 /**
- * Halaman beranda: ringkasan dokumen, integrasi AI (Gemini, 9Router,
- * OpenAI, dll.), lihat model per provider, dan uji coba chat.
+ * Halaman beranda Kuro AI: ringkasan dokumen, integrasi AI (Gemini,
+ * 9Router, dll.), lihat model, percakapan + dikte suara, dan
+ * pemeriksaan dokumen.
  */
 class HomeController extends Controller
 {
@@ -76,7 +77,7 @@ class HomeController extends Controller
         $messages = array_merge(
             [[
                 'role' => 'system',
-                'content' => 'Kamu adalah SkripsiAI, asisten akademik berbahasa Indonesia. '
+                'content' => 'Kamu adalah Kuro AI, asisten akademik berbahasa Indonesia yang ramah. '
                     .'Jawab ringkas, jelas, dan membantu untuk penyusunan skripsi/proposal.',
             ]],
             $history,

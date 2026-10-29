@@ -1,26 +1,25 @@
-# SkripsiAI — AI Reviewer Skripsi & Proposal (Laravel 12+)
+# Kuro AI — AI Reviewer Skripsi & Proposal (Laravel 12+)
 
-Aplikasi Laravel yang membantu mahasiswa menyusun skripsi/proposal: AI menganalisis dokumen DOCX, memberi **highlight warna** pada teks bermasalah, memberi **komentar + saran revisi**, dan menerima input suara otomatis (**auto voice input**).
+**Kuro AI** membantu mahasiswa menyusun skripsi/proposal: AI menganalisis dokumen DOCX, memberi **highlight warna** pada teks bermasalah, memberi **komentar + saran revisi**, dan menerima **input suara otomatis**. Beranda modern dilengkapi **maskot Kuro melayang** dengan animasi saat menganalisis.
 
 Integrasi AI cukup **2 driver**:
 - **`gemini`** — Google Gemini (cukup `GEMINI_API_KEY`).
 - **`openai-compatible`** — **multi-API**: 9Router online, OpenRouter, DeepSeek, OpenAI, Groq, Mistral, vLLM, dll. — cukup `base_url` + `api_key` + `model`. API berformat lain tetap bisa lewat `Ai::extend()`.
 
-> Dibangun untuk Laravel 12+ (PHP 8.2+). Kompatibel dengan struktur Laravel 11/12/13 (routing dan service container sama).
-
-## Fitur
+## Fitur unggulan
 
 | Fitur | Cara kerja |
 | --- | --- |
-| Halaman masuk + beranda | Halaman welcome default Laravel (`Let's get started`) **diganti**: `/` kini halaman beranda yang dilindungi halaman masuk `/login` — password default **123456789** (ubah via `APP_LOGIN_PASSWORD`), sesi berbasis cookie |
-| Integrasi AI: Gemini + multi-API | Driver pattern (`AiManager`): driver `gemini` + driver `openai-compatible` untuk 9Router & gateway lain, `Ai::extend()` untuk format kustom, tabel `ai_settings` agar user menambah provider dari beranda tanpa deploy ulang |
-| Lihat model AI | `GET /api/ai/models` & tombol **Lihat Model** di beranda menampilkan daftar model tiap provider (Gemini `models/`, openai-compatible `/models`) |
-| DOCX | Upload `.docx` → diparse per paragraf (deteksi BAB/sub-bab) → ekspor kembali `.docx` dengan warna highlight + lampiran Laporan Review AI (phpoffice/phpword) |
-| Review skripsi/proposal | Paragraf di-batch → AI menganalisis bahasa, sitasi, metodologi, struktur BAB I–V → tiap temuan jadi `Highlight` + `Comment` |
+| 🎙️ **Voice suara** | Dikte langsung ke percakapan lewat mic (Speech Recognition, `id-ID`) — plus auto voice input untuk dokumen: rekam → berhenti otomatis saat diam → transkripsi Whisper-compatible → dirapikan ke bahasa akademik oleh LLM → masuk paragraf |
+| 🧠 **Cek model** | Tombol **Lihat Model** di beranda & `GET /api/ai/models` menampilkan daftar model tiap provider (Gemini `models/`, openai-compatible `/models`) |
+| 📄 **Periksa dokumen** | Unggah `.docx` dari beranda (drag & drop) → AI menganalisis bahasa, sitasi, metodologi, struktur BAB I–V → highlight warna + komentar + unduh DOCX berwarna + laporan review |
+| 💬 **Riwayat percakapan** | Ikon 💾 menyimpan percakapan, ikon 🕘 membuka riwayat (muat/hapus) — tersimpan di browser; percakapan aktif auto-restore |
+| 🐾 **Maskot Kuro** | Kucing Kuro melayang (animasi CSS) — berkedip & memunculkan cincin scan saat menganalisis ("Kuro sedang menganalisis…") |
+| 🔐 **Halaman masuk + beranda** | Welcome default Laravel **diganti**: `/login` password default **123456789** (ubah via `APP_LOGIN_PASSWORD`), `/` beranda dark modern (font Plus Jakarta Sans via CDN, favicon bubble-K) |
+| DOCX | Parse per paragraf (deteksi BAB/sub-bab) → ekspor `.docx` dengan warna highlight + lampiran Laporan Review AI (phpoffice/phpword) |
 | Tanda warna | merah = bahasa/typo/plagiarisme, kuning = tanpa sitasi, biru = metodologi, ungu = struktur, hijau = gaya akademik |
 | Perbaikan revisi | `POST /highlights/{id}/accept` mengganti teks asli dengan `replacement`, snapshot versi otomatis, plus `accept-all` |
 | Komentar | Komentar AI + manusia per paragraf, balasan (reply), tandai selesai (resolve) |
-| Auto voice input | Rekam → berhenti otomatis saat diam → transkripsi Whisper-compatible → dirapikan ke bahasa akademik oleh LLM → teks otomatis masuk dokumen |
 
 ## Halaman web (masuk + beranda)
 
@@ -30,9 +29,9 @@ Route `routes/web.php` menggantikan halaman welcome bawaan Laravel:
 | --- | --- | --- |
 | GET | `/login` | Halaman masuk (password default `123456789`) |
 | POST | `/login` · `/logout` | Proses masuk / keluar (sesi) |
-| GET | `/` | **Beranda**: statistik dokumen, kartu provider AI (Gemini, 9Router, dll.), tombol *Lihat Model*, uji coba chat, form tambah provider |
+| GET | `/` | **Beranda**: statistik, kartu fitur unggulan, integrasi AI + Lihat Model, percakapan + dikte suara + riwayat tersimpan, panel periksa dokumen (unggah → review → temuan → unduh), form tambah provider, maskot Kuro |
 | GET | `/models` · `/models/{slug}` | (AJAX, butuh login) daftar provider / daftar model satu provider |
-| POST | `/chat` | (AJAX, butuh login) uji coba chat ke provider mana pun |
+| POST | `/chat` | (AJAX, butuh login) percakapan ke provider mana pun |
 
 Integrasi **Gemini** cukup isi `GEMINI_API_KEY` di `.env`. Integrasi **9Router online**: driver `openai-compatible` + base URL instance kamu (`NINEROUTER_BASE_URL`, mis. `https://instance-9router.up.railway.app/v1`) + API key dari dashboard 9Router — atau tambahkan langsung dari form "Tambah Provider" di beranda.
 
@@ -65,9 +64,9 @@ sudo apt install php8.3-zip php8.3-gd php8.3-xml php8.3-curl php8.3-mbstring
 
 ```bash
 # Buat project Laravel baru
-laravel new skripsi-ai
-# atau: composer create-project laravel/laravel skripsi-ai
-cd skripsi-ai
+laravel new kuro-ai
+# atau: composer create-project laravel/laravel kuro-ai
+cd kuro-ai
 
 # Aktifkan route API + queue database
 php artisan install:api
@@ -85,8 +84,8 @@ composer require guzzlehttp/guzzle    # HTTP client untuk semua driver AI (defau
 Repo ini sudah menyertakan `composer.json` lengkap, jadi cukup:
 
 ```bash
-git clone https://github.com/kuro-myths/chat-dokumen-ai.git skripsi-ai
-cd skripsi-ai
+git clone https://github.com/kuro-myths/chat-dokumen-ai.git kuro-ai
+cd kuro-ai
 composer install          # generate vendor/ (laravel/framework, phpword, guzzle, sanctum, dst.)
 composer dump-autoload    # regenerate autoload untuk class di app/Services
 ```
@@ -133,16 +132,17 @@ Minimal isi `GEMINI_API_KEY` di `.env`, atau isi `NINEROUTER_BASE_URL` + `NINERO
 | `could not find driver` (database) | aktifkan `pdo_sqlite`/`pdo_mysql` sesuai koneksi di `.env` |
 | Halaman `/` masih tampil welcome Laravel | pastikan `routes/web.php` dari repo ini yang terpasang (welcome route bawaan tertimpa) |
 | Tombol "Lihat Model" error `Provider belum dikonfigurasi` | API key / base URL provider kosong — isi di `.env` atau tambahkan via form di beranda |
+| Dikte suara tidak jalan | Gunakan Chrome/Edge terbaru (fitur Speech Recognition) dan izinkan akses mikrofon |
 
 ## Struktur file tambahan
 
 ```text
 config/ai.php
-routes/web.php                          # halaman masuk + beranda (mengganti welcome default)
+routes/web.php                          # halaman masuk + beranda Kuro AI (mengganti welcome default)
 app/Providers/AiServiceProvider.php
 app/Services/Ai/
 ├── AiManager.php                  # pusat integrasi: driver gemini + openai-compatible (multi-API)
-├── AiModelService.php              # lihat model AI tiap provider (Gemini / 9Router / dll.)
+├── AiModelService.php              # cek model AI tiap provider (Gemini / 9Router / dll.)
 ├── AiResponse.php
 ├── Contracts/AiProviderInterface.php
 ├── Drivers/
@@ -163,7 +163,7 @@ app/Http/Requests/                # validasi upload
 app/Jobs/RunThesisReview.php
 app/Models/                       # Document, DocumentSection, DocumentVersion, Comment, Highlight, Transcription, AiSetting
 database/migrations/2026_10_28_000001_create_skripsi_ai_tables.php
-resources/views/                  # layouts/app, login, beranda
+resources/views/                  # layouts/app (favicon bubble-K + font CDN), login, beranda
 routes/api.php
 resources/js/voice-input.js        # auto-stop silence detection + auto insert
 ```
@@ -229,6 +229,7 @@ Ai::extend('providerku', function (string $name, array $config) {
 | GET | `/api/documents/{id}/export` | Unduh DOCX berwarna + laporan |
 | POST | `/api/documents/{id}/review` | Review AI via queue |
 | POST | `/api/documents/{id}/review/sync` | Review AI sinkron |
+| GET | `/api/documents/{id}/review` | Status review + ringkasan |
 | GET | `/api/documents/{id}/highlights` | Semua temuan AI |
 | POST | `/api/highlights/{id}/accept`·`/reject` | Terima / tolak revisi |
 | POST | `/api/documents/{id}/highlights/accept-all` | Terima semua |
@@ -243,5 +244,7 @@ Ai::extend('providerku', function (string $name, array $config) {
 
 - API key di tabel `ai_settings` disimpan dengan **encrypted cast** Laravel.
 - Untuk dokumen panjang, gunakan route review async + `queue:work` (timeout job 15 menit).
-- Voice memakai endpoint kompatibel Whisper (`/audio/transcriptions`); bisa diarahkan ke Groq (whisper-large-v3) atau server lokal whisper.cpp via `VOICE_BASE_URL`.
+- Voice memakai endpoint kompatibel Whisper (`/audio/transcriptions`); bisa diarahkan ke Groq (whisper-large-v3) atau server lokal whisper.cpp via `VOICE_BASE_URL`. Dikte di beranda memakai Speech Recognition bawaan browser (Chrome/Edge).
+- Riwayat percakapan tersimpan di localStorage browser; percakapan aktif otomatis dipulihkan saat halaman dibuka lagi.
 - Halaman web memakai sesi Laravel — pastikan `SESSION_DRIVER` aktif (default `database`/`file` sudah cukup).
+- Favicon berupa bubble-K (ikon percakapan) disematkan sebagai SVG inline di `resources/views/layouts/app.blade.php`.
