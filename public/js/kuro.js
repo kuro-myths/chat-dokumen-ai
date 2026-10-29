@@ -1008,9 +1008,10 @@
     });
 
     // ---------- Percakapan: daftar di sidebar + riwayat tersimpan ----------
-    // Percakapan otomatis tersimpan (localStorage) begitu AI menjawab —
-    // daftarnya langsung tampil di sidebar (ala ChatGPT/Gemini), bisa dibuka
-    // lagi atau dihapus; modal "Riwayat tersimpan" memakai daftar yang sama.
+    // Percakapan otomatis tersimpan ke DATABASE (tabel conversations +
+    // messages) begitu AI menjawab — daftarnya tampil di sidebar (ala
+    // ChatGPT/Gemini). localStorage dipakai sebagai cache, jadi sidebar
+    // tetap terisi saat server sebentar tidak terjangkau.
     function getConvs() {
         try { return JSON.parse(localStorage.getItem('kuro_convs')) || []; }
         catch (e) { return []; }
@@ -1048,7 +1049,34 @@
         } catch (e) {}
     })();
 
-    // Simpan / perbarui percakapan aktif ke daftar (dipanggil otomatis tiap AI menjawab).
+    // Tarik daftar percakapan dari server (database) lalu perbarui cache lokal.
+    function fetchConvs() {
+        fetch('/convs', {headers: {'Accept': 'application/json'}})
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (data) {
+                if (!data || !data.ok) return;
+                var local = getConvs();
+                var localOnly = local.filter(function (c) { return !c.sid; });
+                var server = (data.conversations || []).map(function (c) {
+                    var cached = null;
+                    local.forEach(function (x) { if (x.sid === c.id) cached = x; });
+                    return {
+                        id: 's' + c.id,
+                        sid: c.id,
+                        title: c.title || 'Percakapan',
+                        time: c.time || '',
+                        provider: c.provider || null,
+                        count: c.msg_count || 0,
+                        messages: cached ? cached.messages : null
+                    };
+                });
+                setConvs(localOnly.concat(server));
+                renderSideConvs();
+            })
+            .catch(function () {});
+    }
+
+    // Simpan / perbarui percakapan aktif (dipanggil otomatis tiap AI menjawab).
     function upsertConv(customTitle) {
         if (!history.length) return;
         var hasUser = false;
@@ -1060,7 +1088,7 @@
             convs.forEach(function (c) { if (c.id === currentConvId) item = c; });
         }
         if (!item) {
-            item = { id: 'c' + Date.now() + '-' + Math.floor(Math.random() * 9999), title: '', time: '', provider: null, messages: [] };
+            item = { id: 'c' + Date.now() + '-' + Math.floor(Math.random() * 9999), sid: null, title: '', time: '', provider: null, messages: [] };
             convs.unshift(item);
         }
         if (customTitle) item.title = customTitle;
@@ -1072,6 +1100,33 @@
         try { localStorage.setItem('kuro_conv_id', currentConvId); } catch (e) {}
         setConvs(convs);
         renderSideConvs();
+
+        // Kirim ke database (server). sid (id server) disimpan supaya update
+        // berikutnya menimpa baris yang sama, bukan menambah baris baru.
+        var convId = item.id;
+        fetch('/convs', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF},
+            body: JSON.stringify({
+                id: item.sid || null,
+                title: item.title,
+                provider: item.provider,
+                messages: (item.messages || []).map(function (m) {
+                    return {
+                        role: m.role,
+                        content: m.content || '',
+                        type: m.type || null,
+                        image: m.image || null,
+                        video: m.video || null
+                    };
+                })
+            })
+        }).then(function (r) { return r.ok ? r.json() : null; }).then(function (data) {
+            if (!data || !data.ok || !data.id) return;
+            var convs2 = getConvs();
+            convs2.forEach(function (c) { if (c.id === convId && !c.sid) c.sid = data.id; });
+            setConvs(convs2);
+        }).catch(function () {});
     }
 
     function renderSideConvs() {
@@ -1108,22 +1163,53 @@
         var item = null;
         getConvs().forEach(function (c) { if (c.id === id) item = c; });
         if (!item) return;
-        history = (item.messages || []).slice();
         currentConvId = id;
         try { localStorage.setItem('kuro_conv_id', id); } catch (e) {}
-        renderChat();
-        saveCurrent();
-        setMode('chat');
         renderSideConvs();
-        if (isMobile()) shell.classList.remove('sb-open-m');
-        kuroThinking(false, 'Percakapan dimuat kembali ✨');
+
+        var apply = function (msgs) {
+            history = (msgs || []).slice();
+            renderChat();
+            saveCurrent();
+            setMode('chat');
+            renderSideConvs();
+            if (isMobile()) shell.classList.remove('sb-open-m');
+            kuroThinking(false, 'Percakapan dimuat kembali ✨');
+        };
+
+        // Sudah ada di cache lokal -> tampilkan langsung.
+        if (item.messages && item.messages.length) { apply(item.messages); return; }
+
+        // Belum ada isinya -> ambil dari database (server).
+        if (item.sid) {
+            fetch('/convs/' + item.sid, {headers: {'Accept': 'application/json'}})
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (data) {
+                    var msgs = (data && data.ok && data.conversation) ? data.conversation.messages : [];
+                    var convs = getConvs();
+                    convs.forEach(function (c) { if (c.id === id) c.messages = msgs; });
+                    setConvs(convs);
+                    apply(msgs);
+                })
+                .catch(function () { apply(item.messages || []); });
+            return;
+        }
+        apply(item.messages || []);
     }
 
     function deleteConv(id) {
+        var sid = null;
+        getConvs().forEach(function (c) { if (c.id === id) sid = c.sid || null; });
         setConvs(getConvs().filter(function (c) { return c.id !== id; }));
         if (currentConvId === id) {
             currentConvId = null;
             try { localStorage.removeItem('kuro_conv_id'); } catch (e) {}
+        }
+        if (sid) {
+            fetch('/convs/' + sid, {
+                method: 'DELETE',
+                headers: {'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF}
+            }).then(function () { fetchConvs(); }).catch(function () {});
         }
         renderSideConvs();
         renderHistoryModal();
@@ -1150,11 +1236,12 @@
             return;
         }
         convs.forEach(function (item) {
+            var cnt = item.messages ? item.messages.length : (item.count || 0);
             var div = document.createElement('div');
             div.className = 'hist-item';
             div.innerHTML =
                 '<div class="grow"><b>' + esc(item.title || 'Percakapan') + '</b>' +
-                '<small>' + esc(item.time || '') + ' · ' + (item.messages || []).length + ' pesan</small></div>' +
+                '<small>' + esc(item.time || '') + ' · ' + cnt + ' pesan</small></div>' +
                 '<button class="btn small hist-load"><i class="fa-solid fa-rotate-right"></i> Muat</button>' +
                 '<button class="btn small ghost hist-del"><i class="fa-solid fa-trash-can"></i></button>';
             div.querySelector('.hist-load').addEventListener('click', function () {
@@ -1186,6 +1273,10 @@
             try { localStorage.removeItem('kuro_conv_id'); } catch (e) {}
             renderSideConvs();
             renderHistoryModal();
+            fetch('/convs', {
+                method: 'DELETE',
+                headers: {'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF}
+            }).then(function () { fetchConvs(); }).catch(function () {});
         }
     });
 
@@ -1559,7 +1650,7 @@
                 document.getElementById('sync-mode').value = data.mode || 'gemini';
                 applySyncMode();
                 document.getElementById('gemini-model-info').textContent =
-                    'Model otomatis: ' + (data.gemini.model || 'gemini-2.5-flash') + ' — tidak perlu menulis manual.';
+                    'Model otomatis: ' + (data.gemini.model || 'gemini-3.8-flash') + ' — tidak perlu menulis manual.';
                 document.getElementById('manual-base').value = data.manual.base_url || '';
                 document.getElementById('manual-model-info').textContent =
                     'Model otomatis: ' + (data.manual.model || 'dari hasil sinkron router') + ' — tidak perlu menulis manual.';
@@ -1853,6 +1944,7 @@
     loadDocs();
     renderChat();
     renderSideConvs();
+    fetchConvs();
     restoreCurrent();
 })();
 

@@ -35,14 +35,14 @@ class GeminiDriver implements AiProviderInterface
 
     /**
      * Model aktif: override per-request ($options['model'] dari dropdown
-     * model di composer) -> config provider -> default gemini-2.5-flash.
-     * gemini-2.0-flash sudah pensiun — default kini gemini-2.5-flash.
+     * model di composer) -> config provider -> default gemini-3.8-flash.
+     * gemini-2.0-flash sudah pensiun — default kini gemini-3.8-flash.
      */
     protected function model(array $options = []): string
     {
         return trim((string) ($options['model'] ?? ''))
             ?: trim((string) ($this->config['model'] ?? ''))
-            ?: 'gemini-2.5-flash';
+            ?: 'gemini-3.8-flash';
     }
 
     protected function url(string $method, array $options = []): string
@@ -121,7 +121,7 @@ class GeminiDriver implements AiProviderInterface
             $status === 401 || $status === 403 =>
                 'API key Gemini ditolak Google — pastikan kunci lengkap (tidak terpotong), belum dihapus, dan berasal dari AI Studio.',
             $status === 404 =>
-                'Model "'.$this->model().'" tidak tersedia / sudah pensiun — ganti model (mis. gemini-2.5-flash).',
+                'Model "'.$this->model().'" tidak tersedia / sudah pensiun — ganti model (mis. gemini-3.8-flash).',
             $status === 429 =>
                 'Kuota Gemini habis atau terlalu banyak permintaan — tunggu sebentar, atau pakai mode Manual (Max Router).',
             default => 'Gemini error HTTP '.$status.'.',

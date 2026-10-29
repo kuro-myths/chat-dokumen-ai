@@ -13,7 +13,7 @@ Integrasi AI cukup **2 driver**:
 | 🎙️ **Voice suara** | Dikte langsung ke percakapan lewat mic (Speech Recognition, `id-ID`) — plus auto voice input untuk dokumen: rekam → berhenti otomatis saat diam → transkripsi Whisper-compatible → dirapikan ke bahasa akademik oleh LLM → masuk paragraf |
 | 🧠 **Cek model** | Tombol **Lihat Model** di beranda & `GET /api/ai/models` menampilkan daftar model tiap provider (Gemini `models/`, openai-compatible `/models`) |
 | 📄 **Periksa dokumen** | Unggah `.docx` dari beranda (drag & drop) → AI menganalisis bahasa, sitasi, metodologi, struktur BAB I–V → highlight warna + komentar + unduh DOCX berwarna + laporan review |
-| 💬 **Riwayat percakapan** | Ikon 💾 menyimpan percakapan, tombol **Riwayat tersimpan** membuka riwayat (muat/hapus) — tersimpan di browser; percakapan aktif auto-restore |
+| 💬 **Riwayat percakapan** | Otomatis tersimpan ke **DATABASE** (`conversations` + `messages`) tiap AI menjawab; daftar tampil di sidebar (klik = buka, 🗑 = hapus), modal **Riwayat tersimpan** pakai daftar yang sama; cache browser sebagai fallback |
 | 🐾 **Maskot Kuro** | Kucing Kuro melayang (SVG eksternal + animasi) — berkedip & memunculkan cincin scan saat menganalisis ("Kuro sedang menganalisis…") |
 | 🔐 **Halaman masuk + beranda** | Welcome default Laravel **diganti**: `/login` password default **123456789** (ubah via `APP_LOGIN_PASSWORD`), `/` beranda terang ala Gemini — sidebar ungu muda + konten putih (Plus Jakarta Sans & Font Awesome via CDN, favicon bubble-K di `public/img/`) |
 | DOCX | Parse per paragraf (deteksi BAB/sub-bab) → ekspor `.docx` dengan warna highlight + lampiran Laporan Review AI (phpoffice/phpword) |
@@ -32,6 +32,7 @@ Route `routes/web.php` menggantikan halaman welcome bawaan Laravel:
 | GET | `/` | **Beranda** ala Gemini: sidebar (percakapan baru, riwayat, navigasi, statistik), kartu pintasan, percakapan + dikte suara + riwayat tersimpan, panel periksa dokumen (unggah → review → temuan → unduh), integrasi AI + Lihat Model, form tambah provider, maskot Kuro |
 | GET | `/models` · `/models/{slug}` | (AJAX, butuh login) daftar provider / daftar model satu provider |
 | POST | `/chat` | (AJAX, butuh login) percakapan ke provider mana pun |
+| GET/POST/DELETE | `/convs` · `/convs/{id}` | (AJAX, butuh login) riwayat percakapan tersimpan di database |
 
 Integrasi **Gemini** cukup isi `GEMINI_API_KEY` di `.env`. Integrasi **9Router online**: driver `openai-compatible` + base URL instance kamu (`NINEROUTER_BASE_URL`, mis. `https://instance-9router.up.railway.app/v1`) + API key dari dashboard 9Router — atau tambahkan langsung dari form "Tambah Provider" di beranda.
 
@@ -138,11 +139,12 @@ app/Services/Review/
 └── RevisionService.php            # terima/tolak revisi
 app/Services/Voice/VoiceTranscriptionService.php
 app/Http/Controllers/Api/          # Document, Review, Highlight, Comment, Voice, Provider, Model
-app/Http/Controllers/Web/         # AuthController (login) + HomeController (beranda, model, chat)
+app/Http/Controllers/Web/         # AuthController (login) + HomeController (beranda, model, chat) + ConvController (riwayat percakapan)
 app/Http/Requests/                # validasi upload
 app/Jobs/RunThesisReview.php
-app/Models/                       # Document, DocumentSection, DocumentVersion, Comment, Highlight, Transcription, AiSetting
+app/Models/                       # Document, DocumentSection, DocumentVersion, Comment, Highlight, Transcription, AiSetting, Conversation, Message
 database/migrations/2026_10_28_000001_create_skripsi_ai_tables.php
+database/migrations/2026_10_29_000001_create_conversations_tables.php # riwayat percakapan
 resources/views/                   # layouts/app (CDN: Font Awesome + Google Fonts), login, beranda
 public/css/kuro.css                # stylesheet Kuro AI (eksternal, tanpa style inline)
 public/js/kuro.js                  # logika beranda (eksternal, tanpa script inline)
@@ -229,7 +231,7 @@ Ai::extend('providerku', function (string $name, array $config) {
 - API key di tabel `ai_settings` disimpan dengan **encrypted cast** Laravel.
 - Untuk dokumen panjang, gunakan route review async + `queue:work` (timeout job 15 menit).
 - Voice memakai endpoint kompatibel Whisper (`/audio/transcriptions`); bisa diarahkan ke Groq (whisper-large-v3) atau server lokal whisper.cpp via `VOICE_BASE_URL`. Dikte di beranda memakai Speech Recognition bawaan browser (Chrome/Edge).
-- Riwayat percakapan tersimpan di localStorage browser; percakapan aktif otomatis dipulihkan saat halaman dibuka lagi.
+- Riwayat percakapan tersimpan di **database** (migration `2026_10_29_000001_create_conversations_tables`, model `Conversation`/`Message`); localStorage hanya cache fallback.
 - Halaman web memakai sesi Laravel — pastikan `SESSION_DRIVER` aktif (default `database`/`file` sudah cukup).
 - Front-end **tanpa kode inline**: CSS di `public/css/kuro.css`, JS di `public/js/kuro.js`, ikon via **Font Awesome CDN**, font via **Google Fonts CDN**. Class custom memakai prefiks sendiri (`kuro-`, `side-`, `q-`, `prov-`, `doc-`, `hl-`, `hist-`, `chat-`, `login-`) sehingga tidak bentrok dengan library CDN (`fa-*`).
 - Favicon berupa file `public/img/kuro-logo.svg` (bubble-K) — bukan lagi SVG inline.
