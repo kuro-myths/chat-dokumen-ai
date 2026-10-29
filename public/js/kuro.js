@@ -886,19 +886,7 @@
             if (m.price) {
                 var price = document.createElement('span');
                 price.className = 'model-price';
-                price.textContent = '
-    loadProviders();
-    loadDocs();
-    renderChat();
-    restoreCurrent();
-})();
- + m.price.input + ' / 
-    loadProviders();
-    loadDocs();
-    renderChat();
-    restoreCurrent();
-})();
- + m.price.output + ' per 1jt token';
+                price.textContent = '$' + m.price.input + ' / $' + m.price.output + ' per 1jt token';
                 row.appendChild(price);
             }
             if (m.note) row.title = m.note;
