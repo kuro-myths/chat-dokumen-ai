@@ -12,6 +12,18 @@ return [
 
     'default' => env('AI_PROVIDER', 'openai'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Halaman masuk (web)
+    |--------------------------------------------------------------------------
+    | Password untuk halaman /login. Default: 123456789.
+    | Ubah lewat APP_LOGIN_PASSWORD di .env.
+    */
+
+    'login' => [
+        'password' => env('APP_LOGIN_PASSWORD', '123456789'),
+    ],
+
     'providers' => [
 
         'openai' => [
@@ -45,6 +57,16 @@ return [
             'api_key' => env('MISTRAL_API_KEY'),
             'base_url' => 'https://api.mistral.ai/v1',
             'model' => env('MISTRAL_MODEL', 'mistral-large-latest'),
+        ],
+
+        // 9Router (gateway AI kompatibel OpenAI — lokal atau online).
+        // Isi NINEROUTER_BASE_URL dengan URL instance 9Router kamu,
+        // mis. https://instance-9router.up.railway.app/v1
+        '9router' => [
+            'driver' => 'openai-compatible',
+            'api_key' => env('NINEROUTER_API_KEY'),
+            'base_url' => env('NINEROUTER_BASE_URL'),
+            'model' => env('NINEROUTER_MODEL', 'gpt-4o-mini'),
         ],
 
         'ollama' => [

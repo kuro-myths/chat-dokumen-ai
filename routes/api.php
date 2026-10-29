@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\CommentController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\HighlightController;
+use App\Http\Controllers\Api\ModelController;
 use App\Http\Controllers\Api\ProviderController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\VoiceController;
@@ -35,3 +36,7 @@ Route::post('voice/transcribe', [VoiceController::class, 'store']);
 Route::get('ai/providers', [ProviderController::class, 'index']);
 Route::post('ai/providers', [ProviderController::class, 'store']);
 Route::put('ai/providers/default', [ProviderController::class, 'setDefault']);
+
+// ---------- Lihat model AI per provider (Gemini, 9Router, OpenAI, dll.) ----------
+Route::get('ai/models', [ModelController::class, 'index']);     // ?fetch=1 untuk tarik model semua provider
+Route::get('ai/models/{slug}', [ModelController::class, 'show']);
