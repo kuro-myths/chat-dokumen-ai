@@ -215,7 +215,7 @@
             item.className = 'cp-prov-item';
             item.innerHTML =
                 '<i class="fa-solid fa-check chk" style="visibility:' + (p.slug === currentProvider ? 'visible' : 'hidden') + '"></i>' +
-                '<span class="grow">' + esc(p.name) + '<small>' + esc(p.model ? p.model : driverLabel(p)) + '</small></span>';
+                '<span class="grow">' + esc(p.name) + '<small>' + esc(driverLabel(p)) + '</small></span>';
             item.addEventListener('click', function () {
                 currentProvider = p.slug;
                 currentModel = null; // ganti provider -> reset pilihan model
@@ -368,15 +368,186 @@
         el.title = currentModel ? currentModel : 'Pakai model default provider aktif';
     }
 
+    // ---------- Katalog model: akses, spesifikasi & kemampuan (ala katalog) ----------
+    // Kemampuan diambil dari heuristik nama model (katalog lokal di browser);
+    // label gratis/berbayar + harga dari data harga router (server).
+    var modelDetailId = null; // id model yang sedang dibuka detailnya (null = daftar)
+
+    function modelMeta(id) {
+        var s = String(id || '').toLowerCase();
+        function has() {
+            for (var i = 0; i < arguments.length; i++) {
+                if (s.indexOf(String(arguments[i]).toLowerCase()) !== -1) return true;
+            }
+            return false;
+        }
+        var meta = {
+            family: null,
+            desc: 'Model chat serbaguna yang tersedia lewat Max Router.',
+            context: null,
+            maxOut: null,
+            input: 'Teks',
+            output: 'Teks',
+            caps: ['Streaming', 'Tool calling', 'JSON mode'],
+            params: ['max_tokens', 'temperature', 'top_p', 'stop', 'frequency_penalty', 'presence_penalty', 'stream', 'tools', 'tool_choice']
+        };
+        if (has('gemini')) {
+            meta.family = 'Google Gemini';
+            meta.desc = 'Model multimodal Google — memahami teks, gambar, audio & video; cepat dan serbaguna.';
+            meta.context = has('1.5') ? '2M' : '1M';
+            meta.maxOut = '65K';
+            meta.input = 'Teks, Gambar, Audio, Video';
+            meta.caps = ['Vision', 'Video input', 'Tool calling', 'JSON mode', 'Streaming', 'Long context'];
+            if (has('2.5', '3')) meta.caps = meta.caps.concat(['Reasoning']);
+        } else if (has('gpt-4o', 'gpt-4.1', 'gpt-5', 'chatgpt')) {
+            meta.family = 'OpenAI';
+            meta.desc = 'Model unggulan OpenAI — cerdas, cepat, dan mendukung input gambar.';
+            meta.context = '128K';
+            meta.maxOut = has('gpt-5') ? '128K' : '16K';
+            meta.input = 'Teks, Gambar';
+            meta.caps = ['Vision', 'Tool calling', 'JSON mode', 'Streaming'];
+            if (has('gpt-5')) meta.caps = meta.caps.concat(['Reasoning']);
+        } else if (has('o1', 'o3', 'o4-mini')) {
+            meta.family = 'OpenAI';
+            meta.desc = 'Model reasoning OpenAI — berpikir langkah demi langkah sebelum menjawab.';
+            meta.context = '128K';
+            meta.maxOut = '100K';
+            meta.input = 'Teks, Gambar';
+            meta.caps = ['Reasoning', 'Streaming', 'JSON mode', 'Tool calling'];
+        } else if (has('claude')) {
+            meta.family = 'Anthropic';
+            meta.desc = 'Model Claude — kuat untuk analisis, penulisan panjang, dan penggunaan tools.';
+            meta.context = '200K';
+            meta.maxOut = '64K';
+            meta.input = 'Teks, Gambar';
+            meta.caps = ['Vision', 'Tool calling', 'JSON mode', 'Streaming', 'Long context'];
+        } else if (has('qwen')) {
+            meta.family = 'Alibaba Qwen';
+            meta.desc = 'Model Qwen dari Alibaba — multibahasa (termasuk Indonesia) dengan dukungan berpikir.';
+            meta.context = has('omni', '3.8', 'long') ? '1M' : '128K';
+            meta.maxOut = '65K';
+            if (has('vl', 'vision', 'omni')) {
+                meta.input = 'Teks, Gambar' + (has('omni') ? ', Video' : '');
+                meta.caps = meta.caps.concat(['Vision']);
+            }
+            if (has('thinking', 'think', 'r1', 'omni', '3.8')) meta.caps = meta.caps.concat(['Reasoning']);
+            meta.caps = meta.caps.concat(['Long context']);
+        } else if (has('deepseek')) {
+            meta.family = 'DeepSeek';
+            meta.desc = 'Model DeepSeek — efisien dan kuat untuk coding serta penalaran.';
+            meta.context = '128K';
+            meta.maxOut = '8K';
+            if (has('r1', 'think', 'reason')) meta.caps = meta.caps.concat(['Reasoning']);
+        } else if (has('llama')) {
+            meta.family = 'Meta Llama';
+            meta.desc = 'Model open-weight Meta Llama — cepat dan hemat untuk tugas sehari-hari.';
+            meta.context = '128K';
+            meta.maxOut = '8K';
+        } else if (has('mistral', 'mixtral', 'codestral')) {
+            meta.family = 'Mistral';
+            meta.desc = 'Model Mistral — ringan, cepat, dan efisien.';
+            meta.context = has('large') ? '128K' : '32K';
+            meta.maxOut = '8K';
+        } else if (has('grok')) {
+            meta.family = 'xAI Grok';
+            meta.desc = 'Model Grok dari xAI — tajam untuk penalaran dan topik hangat.';
+            meta.context = '128K';
+            meta.maxOut = '32K';
+            meta.caps = meta.caps.concat(['Vision', 'Reasoning']);
+        } else if (has('kimi', 'moonshot', 'glm', 'ernie')) {
+            meta.family = has('kimi', 'moonshot') ? 'Moonshot Kimi' : (has('glm') ? 'Zhipu GLM' : 'Baidu Ernie');
+            meta.desc = 'Model dengan konteks sangat panjang — cocok untuk dokumen besar.';
+            meta.context = '128K+';
+            meta.maxOut = '16K';
+            meta.caps = meta.caps.concat(['Long context', 'Reasoning']);
+        }
+        return meta;
+    }
+
+    function tierBadge(t) {
+        var cls = t === 'free' ? 'badge-free' : (t === 'paid' ? 'badge-paid' : 'badge-unknown');
+        var lbl = t === 'free' ? 'GRATIS' : (t === 'paid' ? 'BERBAYAR' : '?');
+        return '<span class="badge ' + cls + '">' + lbl + '</span>';
+    }
+
+    // "Aksesmu" ala katalog: gratis berbagi jatah token harian / berbayar per 1jt token.
+    function accessLine(m) {
+        if (m.tier === 'free') {
+            return 'Gratis — tanpa biaya. Model gratis dipakai banyak orang sekaligus, jadi kecepatan & stabilitas bisa berubah di jam sibuk.';
+        }
+        if (m.price) {
+            return 'Berbayar — $' + m.price.input + ' input / $' + m.price.output + ' output per 1 juta token.';
+        }
+        return 'Belum diketahui — buka "Sinkron Router & Mode AI" lalu tekan "Sinkron Sekarang" untuk memperbarui label gratis/berbayar.';
+    }
+
+    function renderModelDetail(m) {
+        var meta = modelMeta(m.id);
+        var wrap = document.createElement('div');
+        wrap.className = 'mm-detail';
+        var capsHtml = '';
+        meta.caps.forEach(function (c) { capsHtml += '<span class="mm-chip">' + esc(c) + '</span>'; });
+        var paramsHtml = '';
+        meta.params.forEach(function (p) { paramsHtml += '<code>' + esc(p) + '</code>'; });
+        wrap.innerHTML =
+            '<button type="button" class="mm-back"><i class="fa-solid fa-arrow-left"></i> Kembali ke daftar model</button>' +
+            '<div class="mm-name">' + esc(shortModel(m.id)) + ' ' + tierBadge(m.tier || 'unknown') + '</div>' +
+            (meta.family ? '<div class="mm-family"><i class="fa-solid fa-microchip"></i> ' + esc(meta.family) + '</div>' : '') +
+            '<p class="mm-desc">' + esc(meta.desc) + '</p>' +
+            '<div class="mm-sec"><h5>Aksesmu</h5><p class="mm-access t-' + esc(m.tier || 'unknown') + '">' + esc(accessLine(m)) + '</p></div>' +
+            '<div class="mm-sec"><h5>Spesifikasi</h5><div class="mm-spec">' +
+            '<div><small>Context window</small><b>' + esc(meta.context || '—') + '</b></div>' +
+            '<div><small>Max output</small><b>' + esc(meta.maxOut || '—') + '</b></div>' +
+            '<div><small>Input</small><b>' + esc(meta.input) + '</b></div>' +
+            '<div><small>Output</small><b>' + esc(meta.output) + '</b></div>' +
+            '</div></div>' +
+            '<div class="mm-sec"><h5>Kemampuan</h5><div class="mm-caps">' + capsHtml + '</div></div>' +
+            '<div class="mm-sec"><h5>Parameter yang didukung</h5><div class="mm-params">' + paramsHtml + '</div></div>' +
+            '<button type="button" class="btn small mm-use"><i class="fa-solid fa-check"></i> Pakai model ini</button>';
+        wrap.querySelector('.mm-back').addEventListener('click', function () {
+            modelDetailId = null;
+            renderModelMenu();
+        });
+        wrap.querySelector('.mm-use').addEventListener('click', function () {
+            currentModel = m.id;
+            saveModelChoice();
+            updateModelName();
+            modelDetailId = null;
+            modelMenu.classList.remove('open');
+            renderModelMenu();
+            kuroToast('Model aktif: ' + shortModel(m.id), 'ok');
+        });
+        return wrap;
+    }
+
     function renderModelMenu() {
         if (!modelMenu) return;
         modelMenu.innerHTML = '';
         var provName = 'provider ini';
         providers.forEach(function (p) { if (p.slug === currentProvider) provName = p.name; });
 
+        // Sedang membuka detail satu model -> tampilkan kartu detail, bukan daftar.
+        if (modelDetailId) {
+            var detailModel = null;
+            var cacheAll = modelCache[currentProvider];
+            if (cacheAll && cacheAll.models) {
+                cacheAll.models.forEach(function (m) { if (m.id === modelDetailId) detailModel = m; });
+            }
+            if (detailModel) {
+                modelMenu.appendChild(renderModelDetail(detailModel));
+                return;
+            }
+            modelDetailId = null; // model sudah tidak ada -> kembali ke daftar
+        }
+
         var head = document.createElement('div');
         head.className = 'cp-model-head';
-        head.textContent = 'Model di ' + provName;
+        head.innerHTML = 'Model di ' + esc(provName) +
+            ' <button type="button" class="mm-reload" title="Muat ulang daftar model dari ' + esc(provName) + '"><i class="fa-solid fa-rotate"></i></button>';
+        head.querySelector('.mm-reload').addEventListener('click', function (e) {
+            e.stopPropagation();
+            loadProviderModels(currentProvider, true);
+        });
         modelMenu.appendChild(head);
 
         // Opsi pertama: ikuti model default provider (tanpa override)
@@ -402,23 +573,32 @@
             empty.className = 'cp-model-empty';
             empty.textContent = cache && cache.error ? '✗ ' + cache.error : 'Memuat daftar model…';
             modelMenu.appendChild(empty);
+            var retry = document.createElement('button');
+            retry.type = 'button';
+            retry.className = 'btn small ghost mm-retry-btn';
+            retry.innerHTML = '<i class="fa-solid fa-rotate"></i> Muat ulang daftar model';
+            retry.addEventListener('click', function (e) {
+                e.stopPropagation();
+                loadProviderModels(currentProvider, true);
+            });
+            modelMenu.appendChild(retry);
             return;
         }
         models.forEach(function (m) {
             var t = m.tier || 'unknown';
-            var row = document.createElement('button');
-            row.type = 'button';
-            row.className = 'cp-prov-item';
-            if (m.note) row.title = m.note;
-            row.innerHTML =
+            var row = document.createElement('div');
+            row.className = 'cp-model-row';
+            var main = document.createElement('button');
+            main.type = 'button';
+            main.className = 'cp-prov-item mm-main';
+            if (m.note) main.title = m.note;
+            main.innerHTML =
                 '<i class="fa-solid fa-check chk" style="visibility:' + (m.id === currentModel ? 'visible' : 'hidden') + '"></i>' +
                 '<span class="grow">' + esc(shortModel(m.id)) +
-                '<small>' + esc(m.name || '') +
+                '<small>' + esc(m.name || modelMeta(m.id).family || '') +
                 (m.price ? ' · $' + m.price.input + ' / $' + m.price.output + ' per 1jt token' : '') +
-                '</small></span>' +
-                '<span class="badge ' + (t === 'free' ? 'badge-free' : (t === 'paid' ? 'badge-paid' : 'badge-unknown')) + '">' +
-                (t === 'free' ? 'GRATIS' : (t === 'paid' ? 'BERBAYAR' : '?')) + '</span>';
-            row.addEventListener('click', function () {
+                '</small></span>' + tierBadge(t);
+            main.addEventListener('click', function () {
                 currentModel = m.id;
                 saveModelChoice();
                 updateModelName();
@@ -426,6 +606,19 @@
                 renderModelMenu();
                 kuroToast('Model aktif: ' + shortModel(m.id), 'ok');
             });
+            var info = document.createElement('button');
+            info.type = 'button';
+            info.className = 'mm-info';
+            info.title = 'Detail model — akses, spesifikasi, kemampuan';
+            info.innerHTML = '<i class="fa-solid fa-circle-info"></i>';
+            info.addEventListener('click', function (e) {
+                e.stopPropagation();
+                modelDetailId = m.id;
+                renderModelMenu();
+                modelMenu.scrollTop = 0;
+            });
+            row.appendChild(main);
+            row.appendChild(info);
             modelMenu.appendChild(row);
         });
     }
@@ -548,6 +741,9 @@
                 messages: history
             }));
         } catch (e) {}
+
+        // Simpan juga ke daftar percakapan di sidebar (auto-save tiap AI menjawab).
+        upsertConv();
     }
 
     function restoreCurrent() {
@@ -624,7 +820,11 @@
                 renderChat();
                 status.textContent = '';
                 kuroThinking(false, 'Ada kendala 😿');
-                kuroAlert(data.error || 'Gagal.');
+                                var errMsg = data.error || 'Gagal.';
+                if (/no active credentials|model_not_found|model_not_exists|not_found/i.test(errMsg)) {
+                    errMsg += '\n\nModel yang dipakai tidak aktif di router (tidak ada kredensial untuk provider model tersebut). Buka dropdown model di samping dropdown provider, lalu pilih model lain yang tersedia — atau tekan ikon 🔄 di dropdown untuk memuat ulang daftar model.';
+                }
+                kuroAlert(errMsg);
             }
         }).catch(function (e) {
             hideTyping();
@@ -756,6 +956,9 @@
 
     document.getElementById('btn-new-chat').addEventListener('click', function () {
         history = [];
+        currentConvId = null;
+        try { localStorage.removeItem('kuro_conv_id'); } catch (e) {}
+        renderSideConvs();
         renderChat();
         saveCurrent();
         currentDocId = null;
@@ -804,68 +1007,169 @@
         rec.start();
     });
 
-    // ---------- Riwayat tersimpan ----------
-    function getSaved() {
-        try { return JSON.parse(localStorage.getItem('kuro_saved')) || []; }
+    // ---------- Percakapan: daftar di sidebar + riwayat tersimpan ----------
+    // Percakapan otomatis tersimpan (localStorage) begitu AI menjawab —
+    // daftarnya langsung tampil di sidebar (ala ChatGPT/Gemini), bisa dibuka
+    // lagi atau dihapus; modal "Riwayat tersimpan" memakai daftar yang sama.
+    function getConvs() {
+        try { return JSON.parse(localStorage.getItem('kuro_convs')) || []; }
         catch (e) { return []; }
     }
-    function setSaved(list) {
-        try { localStorage.setItem('kuro_saved', JSON.stringify(list)); } catch (e) {}
+    function setConvs(list) {
+        try { localStorage.setItem('kuro_convs', JSON.stringify((list || []).slice(0, 60))); } catch (e) {}
+    }
+    function convTitle(msgs) {
+        var t = '';
+        (msgs || []).forEach(function (m) {
+            if (!t && m.role === 'user' && m.content) t = m.content;
+        });
+        return (t || 'Percakapan').replace(/\s+/g, ' ').trim().slice(0, 60);
+    }
+    var currentConvId = null;
+    try { currentConvId = localStorage.getItem('kuro_conv_id') || null; } catch (e) {}
+
+    // Impor sekali: riwayat lama (kuro_saved) masuk ke daftar percakapan baru.
+    (function importLegacySaved() {
+        try {
+            var legacy = JSON.parse(localStorage.getItem('kuro_saved') || '[]');
+            if (!legacy.length) return;
+            var convs = getConvs();
+            legacy.forEach(function (item, i) {
+                convs.push({
+                    id: 'legacy-' + i + '-' + Date.now(),
+                    title: item.title || convTitle(item.messages),
+                    time: item.time || '',
+                    provider: item.provider || null,
+                    messages: item.messages || []
+                });
+            });
+            setConvs(convs);
+            localStorage.removeItem('kuro_saved');
+        } catch (e) {}
+    })();
+
+    // Simpan / perbarui percakapan aktif ke daftar (dipanggil otomatis tiap AI menjawab).
+    function upsertConv(customTitle) {
+        if (!history.length) return;
+        var hasUser = false;
+        history.forEach(function (m) { if (m.role === 'user') hasUser = true; });
+        if (!hasUser) return;
+        var convs = getConvs();
+        var item = null;
+        if (currentConvId) {
+            convs.forEach(function (c) { if (c.id === currentConvId) item = c; });
+        }
+        if (!item) {
+            item = { id: 'c' + Date.now() + '-' + Math.floor(Math.random() * 9999), title: '', time: '', provider: null, messages: [] };
+            convs.unshift(item);
+        }
+        if (customTitle) item.title = customTitle;
+        if (!item.title) item.title = convTitle(history);
+        item.time = new Date().toLocaleString('id-ID');
+        item.provider = currentProvider;
+        item.messages = history.slice();
+        currentConvId = item.id;
+        try { localStorage.setItem('kuro_conv_id', currentConvId); } catch (e) {}
+        setConvs(convs);
+        renderSideConvs();
     }
 
+    function renderSideConvs() {
+        var box = document.getElementById('side-convs');
+        if (!box) return;
+        var convs = getConvs();
+        box.innerHTML = '';
+        if (!convs.length) {
+            box.innerHTML = '<p class="side-conv-empty">Belum ada percakapan — mulai chat, otomatis muncul di sini.</p>';
+            return;
+        }
+        convs.forEach(function (c) {
+            var div = document.createElement('button');
+            div.type = 'button';
+            div.className = 'side-conv' + (c.id === currentConvId ? ' active' : '');
+            div.title = c.title || 'Percakapan';
+            div.innerHTML =
+                '<span class="ic"><i class="fa-solid fa-comment-dots"></i></span>' +
+                '<span class="lbl">' + esc(c.title || 'Percakapan') + '</span>' +
+                '<span class="side-conv-del" title="Hapus percakapan"><i class="fa-solid fa-trash-can"></i></span>';
+            div.addEventListener('click', function (e) {
+                if (e.target && e.target.closest && e.target.closest('.side-conv-del')) return;
+                loadConv(c.id);
+            });
+            div.querySelector('.side-conv-del').addEventListener('click', function (e) {
+                e.stopPropagation();
+                deleteConv(c.id);
+            });
+            box.appendChild(div);
+        });
+    }
+
+    function loadConv(id) {
+        var item = null;
+        getConvs().forEach(function (c) { if (c.id === id) item = c; });
+        if (!item) return;
+        history = (item.messages || []).slice();
+        currentConvId = id;
+        try { localStorage.setItem('kuro_conv_id', id); } catch (e) {}
+        renderChat();
+        saveCurrent();
+        setMode('chat');
+        renderSideConvs();
+        if (isMobile()) shell.classList.remove('sb-open-m');
+        kuroThinking(false, 'Percakapan dimuat kembali ✨');
+    }
+
+    function deleteConv(id) {
+        setConvs(getConvs().filter(function (c) { return c.id !== id; }));
+        if (currentConvId === id) {
+            currentConvId = null;
+            try { localStorage.removeItem('kuro_conv_id'); } catch (e) {}
+        }
+        renderSideConvs();
+        renderHistoryModal();
+    }
+
+    // Tombol 💾 — simpan percakapan dengan judul sendiri
     document.getElementById('btn-save-chat').addEventListener('click', function () {
         if (!history.length) { kuroAlert('Belum ada percakapan untuk disimpan.', 'info'); return; }
         var firstUser = '';
         history.forEach(function (m) { if (!firstUser && m.role === 'user') firstUser = m.content; });
         kuroPrompt('Simpan percakapan', (firstUser || 'Percakapan').slice(0, 40), function (title) {
-            var list = getSaved();
-            list.unshift({
-                title: title || 'Percakapan',
-                time: new Date().toLocaleString('id-ID'),
-                provider: currentProvider,
-                messages: history.slice()
-            });
-            setSaved(list);
+            upsertConv(title);
             kuroThinking(false, 'Percakapan tersimpan 💾');
         });
     });
 
-    function renderHistory() {
+    // Modal "Riwayat tersimpan" (daftar yang sama dengan sidebar)
+    function renderHistoryModal() {
         var box = document.getElementById('hist-list');
-        var list = getSaved();
+        var convs = getConvs();
         box.innerHTML = '';
-        if (!list.length) {
+        if (!convs.length) {
             box.innerHTML = '<p class="empty">Belum ada percakapan tersimpan.</p>';
             return;
         }
-        list.forEach(function (item, idx) {
+        convs.forEach(function (item) {
             var div = document.createElement('div');
             div.className = 'hist-item';
             div.innerHTML =
-                '<div class="grow"><b>' + esc(item.title) + '</b>' +
-                '<small>' + esc(item.time) + ' · ' + item.messages.length + ' pesan</small></div>' +
+                '<div class="grow"><b>' + esc(item.title || 'Percakapan') + '</b>' +
+                '<small>' + esc(item.time || '') + ' · ' + (item.messages || []).length + ' pesan</small></div>' +
                 '<button class="btn small hist-load"><i class="fa-solid fa-rotate-right"></i> Muat</button>' +
                 '<button class="btn small ghost hist-del"><i class="fa-solid fa-trash-can"></i></button>';
             div.querySelector('.hist-load').addEventListener('click', function () {
-                history = item.messages.slice();
-                renderChat();
-                saveCurrent();
+                loadConv(item.id);
                 document.getElementById('hist-modal').classList.remove('open');
-                setMode('chat');
-                kuroThinking(false, 'Percakapan dimuat kembali ✨');
             });
             div.querySelector('.hist-del').addEventListener('click', function () {
-                var l = getSaved();
-                l.splice(idx, 1);
-                setSaved(l);
-                renderHistory();
+                deleteConv(item.id);
             });
             box.appendChild(div);
         });
     }
 
     document.getElementById('btn-history').addEventListener('click', function () {
-        renderHistory();
+        renderHistoryModal();
         document.getElementById('hist-modal').classList.add('open');
         if (isMobile()) shell.classList.remove('sb-open-m');
     });
@@ -877,8 +1181,11 @@
     });
     document.getElementById('btn-hist-clear').addEventListener('click', function () {
         if (confirm('Hapus semua percakapan tersimpan?')) {
-            setSaved([]);
-            renderHistory();
+            setConvs([]);
+            currentConvId = null;
+            try { localStorage.removeItem('kuro_conv_id'); } catch (e) {}
+            renderSideConvs();
+            renderHistoryModal();
         }
     });
 
@@ -1545,6 +1852,7 @@
     loadProviders();
     loadDocs();
     renderChat();
+    renderSideConvs();
     restoreCurrent();
 })();
 

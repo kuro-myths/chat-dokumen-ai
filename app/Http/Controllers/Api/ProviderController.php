@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AiSetting;
 use App\Services\Ai\Facades\Ai;
+use App\Services\Ai\MaxRouterService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -60,11 +61,19 @@ class ProviderController extends Controller
             }
 
             // Model otomatis per driver kalau tidak dikirim — user tak perlu menulis manual.
+            // openai-compatible: tanya model TERBAIK yang aktif di router (model
+            // health ledger), bukan gpt-4o-mini yang bisa menabrak provider tanpa
+            // kredensial (404 "No active credentials for provider: ...").
             $model = trim((string) ($data['model'] ?? ''));
             if ($model === '') {
-                $model = $data['driver'] === 'gemini'
-                    ? (string) config('ai.providers.gemini.model', 'gemini-2.5-flash')
-                    : (string) (config('ai.router.model') ?: 'gpt-4o-mini');
+                if ($data['driver'] === 'gemini') {
+                    $model = (string) config('ai.providers.gemini.model', 'gemini-2.5-flash');
+                } else {
+                    $best = app(MaxRouterService::class)
+                        ->bestModel($data['base_url'] ?? null, $data['api_key'] ?? null);
+
+                    $model = (string) ($best ?: (config('ai.router.model') ?: 'gpt-4o-mini'));
+                }
             }
 
             // Base URL tidak dipakai driver gemini — selalu kosong.

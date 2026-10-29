@@ -16,6 +16,12 @@
             <i class="fa-solid fa-plus"></i><span class="lbl">Percakapan baru</span>
         </button>
 
+        {{-- Daftar percakapan — otomatis tersimpan & tampil langsung di sidebar --}}
+        <div class="side-conv-box" id="side-conv-box">
+            <div class="side-conv-head"><span class="lbl">Percakapan</span></div>
+            <div class="side-convs" id="side-convs"><p class="side-conv-empty">Belum ada percakapan — mulai chat, otomatis muncul di sini.</p></div>
+        </div>
+
         <nav class="side-nav">
             <button class="side-item" id="btn-history" title="Riwayat tersimpan">
                 <span class="ic"><i class="fa-solid fa-clock-rotate-left"></i></span><span class="lbl">Riwayat tersimpan</span>
@@ -308,7 +314,7 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('js/kuro.js') }}?v=20261029-9"></script>
+<script src="{{ asset('js/kuro.js') }}?v=20261030-1"></script>
 @endpush
 
 

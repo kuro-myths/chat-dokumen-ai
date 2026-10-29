@@ -3,6 +3,7 @@
 namespace App\Services\Ai;
 
 use App\Models\AiSetting;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Throwable;
 
@@ -209,7 +210,52 @@ class AiModelService
                 'pricing_source' => $routerPricing !== null ? 'data harga router' : 'heuristik nama model',
             ];
         } catch (Throwable $e) {
+            // Live fetch gagal (router sibuk / ditolak sementara) — untuk provider
+            // kompatibel OpenAI, pakai model dari cache sinkron router terakhir
+            // supaya dropdown model di beranda tetap terisi datanya.
+            if (($config['driver'] ?? 'openai-compatible') !== 'gemini') {
+                $cached = $this->cachedRouterModels($config['base_url'] ?? null);
+
+                if ($cached !== null) {
+                    return [
+                        'ok' => true,
+                        'models' => $cached,
+                        'error' => null,
+                        'pricing_source' => 'cache sinkron router terakhir (live gagal: '
+                            .mb_substr($e->getMessage(), 0, 120).')',
+                    ];
+                }
+            }
+
             return ['ok' => false, 'models' => [], 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Model dari cache sinkron Max Router terakhir — dipakai bila GET /models
+     * live sedang gagal. Hanya dikembalikan kalau provider ini mengarah ke
+     * router yang sama dengan hasil sinkron terakhir.
+     *
+     * @return list<array<mixed>>|null
+     */
+    protected function cachedRouterModels(?string $baseUrl): ?array
+    {
+        try {
+            $models = Cache::get('maxrouter.models');
+
+            if (! is_array($models) || $models === []) {
+                return null;
+            }
+
+            $cachedBase = trim((string) Cache::get('maxrouter.base_url', ''));
+
+            if ($cachedBase === '' || ! is_string($baseUrl) || trim((string) $baseUrl) === '') {
+                return $models; // cache lama tanpa base URL — tetap berikan
+            }
+
+            return rtrim(trim((string) $baseUrl), '/') === $cachedBase ? $models : null;
+        } catch (Throwable) {
+            return null;
         }
     }
 

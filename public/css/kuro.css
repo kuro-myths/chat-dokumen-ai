@@ -411,3 +411,52 @@ label{display:block;margin:12px 0 6px;font-size:.78rem;color:var(--muted);font-w
 .msg.typing .dot:nth-child(2){animation-delay:.15s}
 .msg.typing .dot:nth-child(3){animation-delay:.3s}
 @keyframes kuro-dot{0%,60%,100%{transform:translateY(0);opacity:.35}30%{transform:translateY(-5px);opacity:1}}
+
+
+/* ===== Percakapan di sidebar (ala ChatGPT/Gemini) ===== */
+.side-conv-box{display:flex;flex-direction:column;min-height:0;margin-top:2px}
+.side-conv-head{font-size:.66rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--muted);padding:6px 14px 4px;white-space:nowrap;overflow:hidden}
+.side-convs{display:flex;flex-direction:column;gap:2px;overflow-y:auto;min-height:0;max-height:34vh;padding:0 6px 8px}
+.side-conv{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border:none;background:transparent;
+  border-radius:999px;font:inherit;font-size:.8rem;color:#3f3b52;cursor:pointer;text-align:left;white-space:nowrap;overflow:hidden}
+.side-conv:hover{background:rgba(255,255,255,.75)}
+.side-conv.active{background:var(--accent-soft);color:var(--text);font-weight:600}
+.side-conv .ic{width:18px;text-align:center;flex:none;font-size:.8rem;color:#4b4570}
+.side-conv .lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.side-conv-del{flex:none;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:.66rem;color:var(--muted);opacity:0;transition:opacity .12s,background .12s,color .12s}
+.side-conv:hover .side-conv-del,.side-conv.active .side-conv-del{opacity:.75}
+.side-conv-del:hover{background:var(--err-bg);color:var(--err);opacity:1}
+.side-conv-empty{color:var(--muted);font-size:.72rem;margin:0;padding:6px 10px}
+.shell.sb-closed .side-conv-box{display:none}
+
+/* ===== Detail model di dropdown model (akses, spesifikasi, kemampuan, parameter) ===== */
+.mm-reload{border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:.72rem;padding:0 4px}
+.mm-reload:hover{color:var(--accent)}
+.mm-retry-btn{display:flex;margin:4px auto 10px;justify-content:center}
+.cp-model-row{display:flex;align-items:center}
+.cp-model-row .mm-main{flex:1;min-width:0}
+.mm-info{flex:none;width:34px;height:38px;border:none;background:transparent;color:var(--muted);cursor:pointer;
+  border-radius:10px;font-size:.9rem;transition:color .12s,background .12s}
+.mm-info:hover{color:var(--accent);background:var(--accent-soft)}
+.mm-detail{padding:4px 6px 10px}
+.mm-back{display:inline-flex;align-items:center;gap:8px;border:none;background:transparent;color:var(--accent);
+  font:inherit;font-size:.76rem;font-weight:700;cursor:pointer;padding:6px 4px}
+.mm-name{font-size:.92rem;font-weight:800;letter-spacing:-.01em;padding:2px 4px}
+.mm-family{font-size:.7rem;color:var(--muted);padding:2px 4px 6px}
+.mm-desc{margin:0 0 10px;font-size:.78rem;color:var(--text);line-height:1.55;padding:0 4px}
+.mm-sec{padding:8px 4px;border-top:1px solid var(--line)}
+.mm-sec h5{margin:0 0 6px;font-size:.64rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.mm-access{margin:0;font-size:.76rem;line-height:1.5}
+.mm-access.t-free{color:var(--ok)}
+.mm-access.t-paid{color:var(--err)}
+.mm-spec{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
+.mm-spec small{display:block;color:var(--muted);font-size:.62rem}
+.mm-spec b{font-size:.8rem}
+.mm-caps{display:flex;flex-wrap:wrap;gap:5px}
+.mm-chip{display:inline-block;background:var(--accent-soft);color:var(--accent);border-radius:999px;
+  padding:3px 10px;font-size:.66rem;font-weight:700}
+.mm-params{display:flex;flex-wrap:wrap;gap:4px}
+.mm-params code{font-size:.66rem;padding:1px 7px}
+.mm-use{display:flex;width:100%;justify-content:center;margin-top:10px}

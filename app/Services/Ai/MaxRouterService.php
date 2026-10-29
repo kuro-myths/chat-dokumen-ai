@@ -287,18 +287,26 @@ class MaxRouterService
         $this->cachePut('maxrouter.models', $models);
         $this->cachePut('maxrouter.synced_at', now()->toIso8601String());
         $this->cachePut('maxrouter.scope', $scope);
+        $this->cachePut('maxrouter.base_url', $target);
 
         // Daftarkan aplikasi ini sebagai konsumen router (sinkron dua arah).
         $registry = $this->registerOnRouter($target, $apiKey);
 
-        // Perbarui provider "manual" — AI jalan via router aktif (online/offline otomatis).
-        $this->applyToManual($target, $models, $apiKey);
+        // Model terbaik dari router (model health ledger) — jadikan model default
+        // supaya chat tidak menabrak provider tanpa kredensial (mis. gpt-4o-mini
+        // -> 404 "No active credentials for provider: openai").
+        $bestModel = $this->bestModel($target, $apiKey);
+
+        // Perbarui provider "manual" + semua provider yang mengarah ke router ini.
+        $this->applyToManual($target, $models, $apiKey, $bestModel);
+        $this->applyBestModelToRouterProviders($target, $bestModel);
 
         return [
             'ok' => true,
             'scope' => $scope,
             'base_url' => $target,
             'count' => count($models),
+            'best_model' => $bestModel,
             'models' => array_slice($models, 0, 200),
             'registry' => $registry,
             'synced_at' => now()->toIso8601String(),
@@ -334,7 +342,7 @@ class MaxRouterService
     }
 
     /** Perbarui baris provider "manual" di ai_settings. */
-    protected function applyToManual(string $baseUrl, array $models, string $apiKey): void
+    protected function applyToManual(string $baseUrl, array $models, string $apiKey, ?string $bestModel = null): void
     {
         try {
             $manual = AiSetting::where('slug', 'manual')->first();
@@ -346,7 +354,13 @@ class MaxRouterService
                 'is_active' => true,
             ];
 
-            if ($manual !== null && $manual->model !== null) {
+            $weak = ['gpt-4o', 'gpt-4o-mini'];
+
+            if (filled($bestModel)) {
+                // Model terbaik router selalu menang supaya chat langsung jalan.
+                $payload['model'] = $bestModel;
+            } elseif ($manual !== null && $manual->model !== null
+                && ! in_array(strtolower((string) $manual->model), $weak, true)) {
                 $payload['model'] = $manual->model;
             } elseif (! empty($models)) {
                 $payload['model'] = $models[0]['id'];
@@ -361,6 +375,82 @@ class MaxRouterService
             }
 
             AiSetting::updateOrCreate(['slug' => 'manual'], $payload);
+        } catch (Throwable) {
+            // tabel belum dimigrasi — abaikan
+        }
+    }
+
+    /**
+     * Model terbaik yang benar-benar AKTIF di router — dari model health
+     * ledger MAX Router (GET /api/agent/config -> best.id). Dipakai sebagai
+     * model default supaya chat tidak menabrak provider tanpa kredensial
+     * (mis. gpt-4o-mini -> 404 "No active credentials for provider: openai").
+     */
+    public function bestModel(?string $baseUrl = null, ?string $apiKey = null): ?string
+    {
+        $base = trim((string) ($baseUrl ?? '')) !== ''
+            ? $this->normalize(trim((string) $baseUrl))
+            : $this->resolve();
+
+        $key = trim((string) ($apiKey ?? ''));
+
+        if ($key === '') {
+            $key = $this->apiKey();
+        }
+
+        if ($base !== null && $base !== '') {
+            try {
+                $request = Http::timeout($this->timeout())->acceptJson();
+
+                if ($key !== '') {
+                    $request = $request->withToken($key);
+                }
+
+                $response = $request->get($this->root($base).'/api/agent/config');
+
+                if ($response->ok()) {
+                    $json = $response->json();
+                    $id = $json['best']['id'] ?? $json['best'] ?? $json['model'] ?? null;
+
+                    if (is_string($id) && $id !== '') {
+                        $this->cachePut('maxrouter.best_model', $id);
+
+                        return $id;
+                    }
+                }
+            } catch (Throwable) {
+                // router versi lama tanpa endpoint ini — pakai cache di bawah
+            }
+        }
+
+        return $this->cacheGet('maxrouter.best_model');
+    }
+
+    /**
+     * Terapkan model terbaik ke SEMUA provider openai-compatible yang mengarah
+     * ke router ini (mis. "max_router", "xkiro") — hanya mengganti default
+     * lemah (gpt-4o / gpt-4o-mini) yang memicu 404 kredensial.
+     */
+    protected function applyBestModelToRouterProviders(string $baseUrl, ?string $bestModel): void
+    {
+        if ($bestModel === null || trim((string) $bestModel) === '') {
+            return;
+        }
+
+        try {
+            AiSetting::query()
+                ->where('driver', 'openai-compatible')
+                ->whereNotNull('base_url')
+                ->where('is_active', true)
+                ->get()
+                ->each(function (AiSetting $setting) use ($baseUrl, $bestModel) {
+                    $same = $this->normalize((string) $setting->base_url) === $baseUrl;
+                    $weak = in_array(strtolower(trim((string) $setting->model)), ['gpt-4o', 'gpt-4o-mini', ''], true);
+
+                    if ($same && $weak) {
+                        $setting->update(['model' => $bestModel]);
+                    }
+                });
         } catch (Throwable) {
             // tabel belum dimigrasi — abaikan
         }

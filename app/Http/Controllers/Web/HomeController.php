@@ -109,9 +109,19 @@ class HomeController extends Controller
                 'model' => $response->model,
             ]);
         } catch (Throwable $e) {
+            $message = 'Gagal memanggil AI: '.$e->getMessage();
+
+            // Model menabrak provider tanpa kredensial aktif di router — arahkan
+            // user memilih model lain lewat dropdown model (bukan default gpt-4o).
+            if (preg_match('/no active credentials|model_not_found|model_not_exists/i', $message)) {
+                $message .= ' — Model ini tidak aktif di router. Buka dropdown model di samping '
+                    .'dropdown provider, lalu pilih model lain yang tersedia (atau tekan ikon '
+                    .'muat ulang di dropdown untuk memperbarui daftar).';
+            }
+
             return response()->json([
                 'ok' => false,
-                'error' => 'Gagal memanggil AI: '.$e->getMessage(),
+                'error' => $message,
             ], 502);
         }
     }
