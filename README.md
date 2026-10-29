@@ -37,12 +37,12 @@ Integrasi **Gemini** cukup isi `GEMINI_API_KEY` di `.env`. Integrasi **9Router o
 
 ## Instalasi
 
+Repo ini sudah berisi **kerangka Laravel 12 lengkap** (artisan, `public/index.php`, config bawaan, migrasi users/cache/jobs, dsb.) plus fitur Kuro AI — jadi cukup clone + `composer install`.
+
 ### 0. Prasyarat
 
 - PHP **8.2+** dengan ekstensi: `cli, xml, zip, gd, mbstring, curl, pdo_sqlite/pdo_mysql`
 - **Composer**
-
-Install Composer (kalau belum ada):
 
 ```bash
 # Linux/macOS
@@ -52,73 +52,51 @@ sudo mv composer.phar /usr/local/bin/composer
 # Windows: unduh Composer-Setup.exe dari https://getcomposer.org
 ```
 
-Cek: `composer --version`
-
-Ekstensi PHP yang dibutuhkan (Debian/Ubuntu):
-
-```bash
-sudo apt install php8.3-zip php8.3-gd php8.3-xml php8.3-curl php8.3-mbstring
-```
-
-### 1. Buat project + dependensi
-
-```bash
-# Buat project Laravel baru
-laravel new kuro-ai
-# atau: composer create-project laravel/laravel kuro-ai
-cd kuro-ai
-
-# Aktifkan route API + queue database
-php artisan install:api
-php artisan install:database  # atau konfigurasi .env + php artisan migrate
-
-# Dependensi proyek
-composer require phpoffice/phpword   # parse & export DOCX + highlight warna
-composer require guzzlehttp/guzzle    # HTTP client untuk semua driver AI (default Laravel, pastikan ada)
-```
-
-> Facade `Http::` Laravel membutuhkan Guzzle (Laravel 11+ sudah include). Yang **wajib** tambahan hanya `phpoffice/phpword`.
-
-### 2. Clone repo ini & install dependensi langsung
-
-Repo ini sudah menyertakan `composer.json` lengkap, jadi cukup:
+### 1. Clone & install
 
 ```bash
 git clone https://github.com/kuro-myths/chat-dokumen-ai.git kuro-ai
 cd kuro-ai
-composer install          # generate vendor/ (laravel/framework, phpword, guzzle, sanctum, dst.)
-composer dump-autoload    # regenerate autoload untuk class di app/Services
+composer install          # laravel/framework, phpword, guzzle, sanctum, dst.
+composer dump-autoload    # regenerate autoload class di app/Services
 ```
 
-> Catatan: repo ini berisi file tambahan di atas kerangka Laravel standar. Jika kamu mulai dari `laravel new` (Cara A di atas), salin folder `app/`, `config/`, `database/migrations/`, `public/`, `routes/`, `resources/` ke path yang sama, lalu jalankan `composer dump-autoload`. `routes/web.php` repo ini menimpa route welcome bawaan Laravel.
-
-Daftarkan provider di `bootstrap/providers.php`:
-
-```php
-return [
-    App\Providers\AppServiceProvider::class,
-    App\Providers\AiServiceProvider::class,
-];
-```
-
-### 3. Environment & migrasi
+### 2. Environment & migrasi
 
 ```bash
 cp .env.example .env
 php artisan key:generate
-cat env.example.additions >> .env   # tambah GEMINI_API_KEY, NINEROUTER_*, APP_LOGIN_PASSWORD, dll.
+# Tambah API key AI (opsional): GEMINI_API_KEY / NINEROUTER_* — atau lewat form di beranda
 php artisan migrate
-php artisan storage:link           # supaya file upload/DOCX bisa diakses
+php artisan storage:link
 ```
 
-### 4. Jalankan
+### 3. Jalankan
 
 ```bash
 php artisan serve       # buka http://127.0.0.1:8000 -> halaman masuk (password default 123456789)
-php artisan queue:work  # WAJIB di terminal terpisah: review AI diproses via queue
+php artisan queue:work  # terminal terpisah: review AI via queue (opsional — QUEUE_CONNECTION=sync jalan tanpa ini)
 ```
 
-Minimal isi `GEMINI_API_KEY` di `.env`, atau isi `NINEROUTER_BASE_URL` + `NINEROUTER_API_KEY` untuk 9Router online, atau tambahkan provider kompatibel OpenAI lain dari form di beranda.
+### 4. Deploy ke Railway
+
+Repo sudah siap deploy (ada `Procfile` + kerangka lengkap):
+
+1. Railway → **New Project** → **Deploy from GitHub repo** → pilih repo ini (branch `main`).
+2. Build otomatis via Nixpacks (`composer install`), lalu `Procfile` dijalankan:
+
+   ```
+   cp -n .env.example .env; php artisan key:generate --force; php artisan migrate --force; php artisan storage:link; php artisan serve --host 0.0.0.0 --port=$PORT
+   ```
+
+3. Buka domain `https://<service>.up.railway.app` → halaman masuk Kuro AI (password default `123456789`).
+4. (Opsional) Tab **Variables**: isi `GEMINI_API_KEY` / `NINEROUTER_BASE_URL` + `NINEROUTER_API_KEY` / `APP_LOGIN_PASSWORD`.
+
+Catatan Railway:
+- **SQLite ephemeral** — database & file unggahan hilang tiap redeploy. Untuk persistensi: pasang **Volume** (mount ke `/app/database`) atau ganti ke Postgres/MySQL (ubah `DB_CONNECTION` + variabel `DB_*`).
+- `QUEUE_CONNECTION=sync` (default `.env.example`) → review dokumen jalan langsung tanpa worker. Mau queue asli? Set `QUEUE_CONNECTION=database` lalu buat service kedua dengan start command `php artisan queue:work`.
+- Log aplikasi tampil di deploy logs (`LOG_CHANNEL=stderr`).
+- SSL/https ditangani Railway; `bootstrap/app.php` sudah `trustProxies(at: '*')` supaya URL `https://` benar.
 
 ### 5. Troubleshooting instalasi
 
@@ -128,12 +106,13 @@ Minimal isi `GEMINI_API_KEY` di `.env`, atau isi `NINEROUTER_BASE_URL` + `NINERO
 | `ext-zip missing` saat install phpword | `sudo apt install php8.3-zip` lalu ulangi `composer require` |
 | `ext-gd missing` | `sudo apt install php8.3-gd` |
 | `ext-dom missing` | `sudo apt install php8.3-xml` |
-| Review tidak pernah selesai | queue tidak jalan — jalankan `php artisan queue:work` |
+| Review tidak pernah selesai | queue tidak jalan — jalankan `php artisan queue:work` (atau pakai `QUEUE_CONNECTION=sync`) |
 | `could not find driver` (database) | aktifkan `pdo_sqlite`/`pdo_mysql` sesuai koneksi di `.env` |
 | Halaman `/` masih tampil welcome Laravel | pastikan `routes/web.php` dari repo ini yang terpasang (welcome route bawaan tertimpa) |
 | Tombol "Lihat Model" error `Provider belum dikonfigurasi` | API key / base URL provider kosong — isi di `.env` atau tambahkan via form di beranda |
 | Dikte suara tidak jalan | Gunakan Chrome/Edge terbaru (fitur Speech Recognition) dan izinkan akses mikrofon |
-| Ikon tidak muncul | Pastikan koneksi internet aktif (Font Awesome & Google Fonts dimuat via CDN) atau ganti ke CDN alternatif |
+| Ikon tidak muncul | Pastikan koneksi internet aktif (Font Awesome & Google Fonts dimuat via CDN) |
+| Railway 404 | Pastikan deploy dari branch `main` terbaru (repo lama belum berisi artisan/index.php), cek deploy logs |
 
 ## Struktur file tambahan
 
@@ -254,3 +233,4 @@ Ai::extend('providerku', function (string $name, array $config) {
 - Halaman web memakai sesi Laravel — pastikan `SESSION_DRIVER` aktif (default `database`/`file` sudah cukup).
 - Front-end **tanpa kode inline**: CSS di `public/css/kuro.css`, JS di `public/js/kuro.js`, ikon via **Font Awesome CDN**, font via **Google Fonts CDN**. Class custom memakai prefiks sendiri (`kuro-`, `side-`, `q-`, `prov-`, `doc-`, `hl-`, `hist-`, `chat-`, `login-`) sehingga tidak bentrok dengan library CDN (`fa-*`).
 - Favicon berupa file `public/img/kuro-logo.svg` (bubble-K) — bukan lagi SVG inline.
+- `bootstrap/app.php` memuat route API + `trustProxies(at: '*')` (diperlukan di balik reverse proxy seperti Railway/nginx).
