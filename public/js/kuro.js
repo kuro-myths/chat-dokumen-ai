@@ -196,7 +196,6 @@
             name: f.name.value.trim(),
             driver: f.driver.value,
             base_url: f.base_url.value.trim() || null,
-            model: f.model.value.trim() || null,
             api_key: f.api_key.value.trim() || null,
             is_default: f.is_default.checked
         };
@@ -965,9 +964,11 @@
                 if (!data.ok) return;
                 document.getElementById('sync-mode').value = data.mode || 'gemini';
                 applySyncMode();
-                document.getElementById('gemini-model').value = data.gemini.model || '';
+                document.getElementById('gemini-model-info').textContent =
+                    'Model otomatis: ' + (data.gemini.model || 'gemini-2.5-flash') + ' — tidak perlu menulis manual.';
                 document.getElementById('manual-base').value = data.manual.base_url || '';
-                document.getElementById('manual-model').value = data.manual.model || '';
+                document.getElementById('manual-model-info').textContent =
+                    'Model otomatis: ' + (data.manual.model || 'dari hasil sinkron router') + ' — tidak perlu menulis manual.';
                 document.getElementById('setup-msg').textContent = data.gemini.api_key_set
                     ? 'Key Gemini sudah tersimpan — isi ulang hanya untuk mengganti.'
                     : 'Key Gemini belum diisi (ambil di aistudio.google.com/api-keys).';
@@ -1038,10 +1039,8 @@
         var body = {
             mode: document.getElementById('sync-mode').value,
             gemini_api_key: document.getElementById('gemini-key').value.trim() || null,
-            gemini_model: document.getElementById('gemini-model').value.trim() || null,
             manual_base_url: document.getElementById('manual-base').value.trim() || null,
-            manual_api_key: document.getElementById('manual-key').value.trim() || null,
-            manual_model: document.getElementById('manual-model').value.trim() || null
+            manual_api_key: document.getElementById('manual-key').value.trim() || null
         };
         return fetch('/api/ai/setup', {
             method: 'POST',

@@ -150,22 +150,17 @@
             <p class="muted">
                 Contoh 9Router online: driver <b>openai-compatible</b>,
                 base URL <code>https://instance-9router-kamu.up.railway.app/v1</code>,
-                API key dari dashboard 9Router, model bebas (mis. <code>gpt-4o-mini</code>).
+                API key dari dashboard 9Router. Model dipilih otomatis — tidak perlu menulis manual.
                 Untuk Gemini cukup isi nama, driver <code>gemini</code>, dan API key — slug dibuat otomatis dari nama.
             </p>
             <form id="provider-form">
                 <label>Nama</label>
                 <input name="name" placeholder="9Router Online / Gemini" required>
-                <div class="prow">
-                    <div>
-                        <label>Driver</label>
-                        <select name="driver">
-                            <option value="openai-compatible">openai-compatible (9Router, OpenRouter, dll.)</option>
-                            <option value="gemini">gemini</option>
-                        </select>
-                    </div>
-                    <div><label>Model</label><input name="model" placeholder="gpt-4o-mini"></div>
-                </div>
+                <label>Driver</label>
+                <select name="driver">
+                    <option value="openai-compatible">openai-compatible (9Router, OpenRouter, dll.)</option>
+                    <option value="gemini">gemini</option>
+                </select>
                 <label>Base URL (khusus openai-compatible)</label>
                 <input name="base_url" placeholder="https://instance-9router-kamu.up.railway.app/v1">
                 <label>API Key</label>
@@ -208,8 +203,7 @@
             <div id="sync-gemini" class="sync-panel">
                 <label>API Key Gemini</label>
                 <input id="gemini-key" placeholder="AIza... / AQ.Ab8... — keduanya valid (kosongkan = pakai yang tersimpan)" autocomplete="off">
-                <label>Model Gemini</label>
-                <input id="gemini-model" placeholder="gemini-2.5-flash">
+                <p class="hint" id="gemini-model-info">Model dipilih otomatis — tidak perlu menulis manual.</p>
                 <p class="hint">
                     API key gratis di
                     <a href="https://aistudio.google.com/api-keys" target="_blank" rel="noopener">aistudio.google.com/api-keys</a>.
@@ -232,8 +226,7 @@
                 <input id="manual-base" placeholder="https://instance-maxrouter-kamu.up.railway.app/v1">
                 <label>API Key Router (opsional bila REQUIRE_API_KEY=false)</label>
                 <input id="manual-key" placeholder="sk-... (kosongkan = pakai yang tersimpan / .env)" autocomplete="off">
-                <label>Model</label>
-                <input id="manual-model" placeholder="gpt-4o-mini / model hasil sinkron">
+                <p class="hint" id="manual-model-info">Model dipilih otomatis dari hasil sinkron router — tidak perlu menulis manual.</p>
             </div>
 
             <div class="prow" style="margin-top:14px">
@@ -292,6 +285,6 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('js/kuro.js') }}?v=20261029-2"></script>
+<script src="{{ asset('js/kuro.js') }}?v=20261029-3"></script>
 @endpush
 

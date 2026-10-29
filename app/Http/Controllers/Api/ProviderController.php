@@ -24,8 +24,11 @@ class ProviderController extends Controller
     }
 
     /**
-     * Tambah provider AI baru dari API APA PUN — TANPA perlu isi slug
-     * (field slug sudah dihapus dari UI; slug dibuat otomatis dari nama).
+     * Tambah provider AI baru dari API APA PUN — TANPA perlu isi slug & model
+     * (field slug dan model sudah dihapus dari UI):
+     * - slug  -> dibuat otomatis dari nama.
+     * - model -> dipilih otomatis per driver (gemini -> gemini-2.5-flash,
+     *            openai-compatible -> default dari config router).
      *
      * Gemini -> driver "gemini" (key format AIza... maupun AQ.Ab8...).
      * Endpoint kompatibel OpenAI (Max Router, OpenRouter, dll.)
@@ -54,6 +57,14 @@ class ProviderController extends Controller
             $slug = $base.'-'.(++$suffix);
         }
 
+        // Model otomatis per driver kalau tidak dikirim — user tak perlu menulis manual.
+        $model = trim((string) ($data['model'] ?? ''));
+        if ($model === '') {
+            $model = $data['driver'] === 'gemini'
+                ? (string) config('ai.providers.gemini.model', 'gemini-2.5-flash')
+                : (string) (config('ai.router.model') ?: 'gpt-4o-mini');
+        }
+
         // Provider dengan slug sudah pernah ada -> perbarui, bukan error.
         $setting = AiSetting::updateOrCreate(
             ['slug' => $slug],
@@ -61,7 +72,7 @@ class ProviderController extends Controller
                 'name' => $data['name'],
                 'driver' => $data['driver'],
                 'base_url' => $data['base_url'] ?? null,
-                'model' => $data['model'] ?? null,
+                'model' => $model,
                 'is_active' => true,
             ],
         );
