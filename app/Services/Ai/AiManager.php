@@ -4,9 +4,7 @@ namespace App\Services\Ai;
 
 use App\Models\AiSetting;
 use App\Services\Ai\Contracts\AiProviderInterface;
-use App\Services\Ai\Drivers\AnthropicDriver;
 use App\Services\Ai\Drivers\GeminiDriver;
-use App\Services\Ai\Drivers\OllamaDriver;
 use App\Services\Ai\Drivers\OpenAiCompatibleDriver;
 use Closure;
 use InvalidArgumentException;
@@ -15,10 +13,13 @@ use InvalidArgumentException;
  * Pusat integrasi AI. Semua provider — dari config maupun dari
  * database (tabel ai_settings) — dibangun lewat kelas ini.
  *
- * Integrasi API APA PUN:
- * 1. Endpoint kompatibel OpenAI  -> cukup isi driver "openai-compatible" + base_url.
- * 2. Endpoint dengan format lain -> daftarkan driver sendiri:
- *      Ai::extend('providerku', fn (string $name, array $config) => new DriverKu($name, $config));
+ * Dua driver bawaan:
+ * 1. gemini            -> Google Gemini (cukup GEMINI_API_KEY).
+ * 2. openai-compatible -> MULTI-API: 9Router, OpenRouter, OpenAI, DeepSeek,
+ *                        Groq, Mistral, vLLM, dll. — cukup base_url + api_key.
+ *
+ * API dengan format lain -> daftarkan driver sendiri:
+ *   Ai::extend('providerku', fn (string $name, array $config) => new DriverKu($name, $config));
  */
 class AiManager
 {
@@ -49,7 +50,7 @@ class AiManager
     /**
      * Daftarkan driver baru tanpa menyentuh core — cukup satu Closure.
      * Contoh di AppServiceProvider::boot():
-     *   Ai::extend('deepseek', fn (string $name, array $cfg) => new OpenAiCompatibleDriver($name, $cfg));
+     *   Ai::extend('apiku', fn (string $name, array $cfg) => new DriverApiKu($name, $cfg));
      */
     public function extend(string $driver, Closure $creator): static
     {
@@ -78,12 +79,10 @@ class AiManager
         }
 
         return match ($driver) {
-            'openai', 'openai-compatible' => new OpenAiCompatibleDriver($name, $config),
-            'anthropic' => new AnthropicDriver($name, $config),
             'gemini' => new GeminiDriver($name, $config),
-            'ollama' => new OllamaDriver($name, $config),
+            'openai', 'openai-compatible' => new OpenAiCompatibleDriver($name, $config),
             default => throw new InvalidArgumentException(
-                "Driver [{$driver}] tidak dikenal. Gunakan Ai::extend() untuk API kustom."
+                "Driver [{$driver}] tidak dikenal. Gunakan 'gemini' atau 'openai-compatible' (multi-API), atau Ai::extend() untuk API kustom."
             ),
         };
     }
@@ -99,7 +98,7 @@ class AiManager
             $slug = null; // tabel belum dimigrasi
         }
 
-        return $slug ?? $this->config['default'] ?? 'openai';
+        return $slug ?? $this->config['default'] ?? 'gemini';
     }
 
     protected function findSetting(string $name): ?AiSetting

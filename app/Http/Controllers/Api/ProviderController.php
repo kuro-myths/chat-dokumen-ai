@@ -24,14 +24,15 @@ class ProviderController extends Controller
 
     /**
      * Tambah provider AI baru dari API APA PUN.
-     * Endpoint kompatibel OpenAI -> driver "openai-compatible" + base_url.
+     * Gemini -> driver "gemini". Endpoint kompatibel OpenAI (9Router,
+     * OpenRouter, dll.) -> driver "openai-compatible" + base_url.
      */
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
             'slug' => ['required', 'string', 'max:60', 'alpha_dash', 'unique:ai_settings,slug'],
             'name' => ['required', 'string', 'max:120'],
-            'driver' => ['required', 'in:openai,openai-compatible,anthropic,gemini,ollama'],
+            'driver' => ['required', 'in:openai-compatible,gemini,openai'],
             'base_url' => ['nullable', 'url', 'required_if:driver,openai-compatible'],
             'model' => ['nullable', 'string', 'max:120'],
             'api_key' => ['nullable', 'string', 'max:255'],

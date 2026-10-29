@@ -8,14 +8,12 @@ use Throwable;
 
 /**
  * Daftar model AI yang tersedia di tiap provider.
- * Mendukung semua driver bawaan: Gemini, OpenAI/kompatibel (9Router,
- * OpenRouter, DeepSeek, Groq, Mistral, vLLM, dll.), Anthropic, dan Ollama.
+ * Driver gemini -> Google AI Studio; driver openai-compatible (9Router,
+ * OpenRouter, DeepSeek, dll.) -> endpoint /models.
  */
 class AiModelService
 {
     protected const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
-
-    protected const ANTHROPIC_BASE = 'https://api.anthropic.com/v1';
 
     /**
      * Daftar semua provider (config + database) TANPA memanggil API eksternal.
@@ -39,7 +37,7 @@ class AiModelService
             ];
         }
 
-        // Provider dari database (ditambah via /api/ai/providers) menimpa config.
+        // Provider dari database (ditambah via beranda / /api/ai/providers) menimpa config.
         try {
             foreach (AiSetting::where('is_active', true)->get() as $setting) {
                 $providers[$setting->slug] = [
@@ -105,13 +103,10 @@ class AiModelService
 
             $models = match ($driver) {
                 'gemini' => $this->geminiModels($config['api_key'] ?? ''),
-                'anthropic' => $this->anthropicModels($config['api_key'] ?? ''),
-                'ollama' => $this->ollamaModels($config['base_url'] ?? 'http://127.0.0.1:11434'),
-                'openai', 'openai-compatible' => $this->openAiModels(
+                default => $this->openAiModels(
                     $config['base_url'] ?? 'https://api.openai.com/v1',
                     $config['api_key'] ?? '',
                 ),
-                default => throw new \InvalidArgumentException("Driver [{$driver}] tidak dikenal."),
             };
         } catch (Throwable $e) {
             return ['ok' => false, 'models' => [], 'error' => $e->getMessage()];
@@ -144,9 +139,7 @@ class AiModelService
         $key = trim((string) ($config['api_key'] ?? ''));
 
         return match ($driver) {
-            'ollama' => true, // lokal, tanpa API key
-            'gemini', 'anthropic' => $key !== '',
-            'openai' => $key !== '',
+            'gemini' => $key !== '',
             default => $key !== '' && ! empty($config['base_url']),
         };
     }
@@ -160,7 +153,7 @@ class AiModelService
 
         $response->throw();
 
-        $models = collect($response->json('models', []))
+        return collect($response->json('models', []))
             ->filter(fn ($m) => in_array('generateContent', $m['supportedGenerationMethods'] ?? [], true))
             ->map(fn ($m) => [
                 'id' => str_replace('models/', '', (string) ($m['name'] ?? '')),
@@ -168,11 +161,9 @@ class AiModelService
             ])
             ->values()
             ->all();
-
-        return $models;
     }
 
-    /** OpenAI & semua endpoint kompatibel (9Router, OpenRouter, Groq, dll.): GET {base}/models */
+    /** Multi-API (9Router, OpenRouter, DeepSeek, dll.): GET {base}/models */
     protected function openAiModels(string $baseUrl, string $apiKey): array
     {
         $response = Http::withToken($apiKey)
@@ -185,40 +176,6 @@ class AiModelService
         return collect($response->json('data', []))
             ->map(fn ($m) => ['id' => $m['id'] ?? $m['name'] ?? '?', 'name' => null])
             ->sortBy('id')
-            ->values()
-            ->all();
-    }
-
-    /** Anthropic: GET /v1/models */
-    protected function anthropicModels(string $apiKey): array
-    {
-        $response = Http::withHeaders([
-            'x-api-key' => $apiKey,
-            'anthropic-version' => '2023-06-01',
-        ])
-            ->timeout(20)
-            ->acceptJson()
-            ->get(self::ANTHROPIC_BASE.'/models', ['limit' => 100]);
-
-        $response->throw();
-
-        return collect($response->json('data', []))
-            ->map(fn ($m) => ['id' => $m['id'] ?? '?', 'name' => $m['display_name'] ?? null])
-            ->values()
-            ->all();
-    }
-
-    /** Ollama lokal: GET /api/tags */
-    protected function ollamaModels(string $baseUrl): array
-    {
-        $response = Http::timeout(10)
-            ->acceptJson()
-            ->get(rtrim($baseUrl, '/').'/api/tags');
-
-        $response->throw();
-
-        return collect($response->json('models', []))
-            ->map(fn ($m) => ['id' => $m['name'] ?? $m['model'] ?? '?', 'name' => $m['details']['family'] ?? null])
             ->values()
             ->all();
     }

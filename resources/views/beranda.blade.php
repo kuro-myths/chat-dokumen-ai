@@ -27,8 +27,9 @@
     <div class="card">
         <h2>🧠 Integrasi AI</h2>
         <p class="muted">
-            Gemini, 9Router online, OpenAI, Groq, Mistral, Anthropic, Ollama, atau API kustom apa pun.
-            Klik <b>Lihat Model</b> untuk menampilkan daftar model tiap provider.
+            <b>Gemini</b> (driver <code>gemini</code>) dan <b>multi-API</b> seperti 9Router online
+            (driver <code>openai-compatible</code>). Klik <b>Lihat Model</b> untuk menampilkan
+            daftar model tiap provider.
         </p>
         <div class="grid" id="providers"><p class="muted">Memuat provider…</p></div>
     </div>
@@ -53,7 +54,7 @@
     <div class="card" style="margin-top:22px;margin-bottom:40px">
         <h2>➕ Tambah Provider</h2>
         <p class="muted">
-            9Router / MAX Router online contohnya: driver <b>openai-compatible</b>,
+            Contoh 9Router online: driver <b>openai-compatible</b>,
             base URL <code>https://instance-9router-kamu.up.railway.app/v1</code>, API key dari dashboard 9Router,
             model bebas (mis. <code>gpt-4o-mini</code>).
         </p>
@@ -71,9 +72,6 @@
                 <select name="driver">
                     <option value="openai-compatible">openai-compatible (9Router, OpenRouter, dll.)</option>
                     <option value="gemini">gemini</option>
-                    <option value="openai">openai</option>
-                    <option value="anthropic">anthropic</option>
-                    <option value="ollama">ollama</option>
                 </select>
             </div>
             <div style="flex:2;min-width:220px">
@@ -112,7 +110,6 @@
     function driverLabel(p) {
         if (p.base_url) return p.driver + ' · ' + p.base_url;
         if (p.driver === 'gemini') return 'gemini · Google AI Studio API';
-        if (p.driver === 'anthropic') return 'anthropic · api.anthropic.com';
         return p.driver;
     }
 

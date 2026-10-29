@@ -7,10 +7,11 @@ return [
     | Provider AI default
     |--------------------------------------------------------------------------
     | Provider bisa berasal dari config ini, atau dari tabel ai_settings
-    | (API apa pun yang ditambahkan user lewat endpoint /api/ai/providers).
+    | (API apa pun yang ditambahkan user lewat beranda / /api/ai/providers).
+    | Driver tersedia: "gemini" dan "openai-compatible" (multi-API).
     */
 
-    'default' => env('AI_PROVIDER', 'openai'),
+    'default' => env('AI_PROVIDER', 'gemini'),
 
     /*
     |--------------------------------------------------------------------------
@@ -26,40 +27,14 @@ return [
 
     'providers' => [
 
-        'openai' => [
-            'driver' => 'openai',
-            'api_key' => env('OPENAI_API_KEY'),
-            'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
-            'model' => env('OPENAI_MODEL', 'gpt-4o'),
-        ],
-
-        'anthropic' => [
-            'driver' => 'anthropic',
-            'api_key' => env('ANTHROPIC_API_KEY'),
-            'model' => env('ANTHROPIC_MODEL', 'claude-sonnet-4-5'),
-        ],
-
+        // Google Gemini — driver khusus Gemini.
         'gemini' => [
             'driver' => 'gemini',
             'api_key' => env('GEMINI_API_KEY'),
             'model' => env('GEMINI_MODEL', 'gemini-2.0-flash'),
         ],
 
-        'groq' => [
-            'driver' => 'openai-compatible',
-            'api_key' => env('GROQ_API_KEY'),
-            'base_url' => 'https://api.groq.com/openai/v1',
-            'model' => env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
-        ],
-
-        'mistral' => [
-            'driver' => 'openai-compatible',
-            'api_key' => env('MISTRAL_API_KEY'),
-            'base_url' => 'https://api.mistral.ai/v1',
-            'model' => env('MISTRAL_MODEL', 'mistral-large-latest'),
-        ],
-
-        // 9Router (gateway AI kompatibel OpenAI — lokal atau online).
+        // 9Router (gateway AI multi-provider, kompatibel OpenAI — lokal atau online).
         // Isi NINEROUTER_BASE_URL dengan URL instance 9Router kamu,
         // mis. https://instance-9router.up.railway.app/v1
         '9router' => [
@@ -69,14 +44,9 @@ return [
             'model' => env('NINEROUTER_MODEL', 'gpt-4o-mini'),
         ],
 
-        'ollama' => [
-            'driver' => 'ollama',
-            'base_url' => env('OLLAMA_BASE_URL', 'http://127.0.0.1:11434'),
-            'model' => env('OLLAMA_MODEL', 'llama3.1'),
-        ],
-
-        // Driver serbaguna: provider mana pun dengan endpoint
-        // kompatibel OpenAI (DeepSeek, Together, OpenRouter, vLLM, dsb.)
+        // MULTI-API: provider mana pun dengan endpoint kompatibel OpenAI
+        // (OpenRouter, DeepSeek, OpenAI, Groq, Mistral, vLLM, dsb.) —
+        // cukup base_url + api_key + model.
         'custom' => [
             'driver' => 'openai-compatible',
             'api_key' => env('CUSTOM_AI_API_KEY'),

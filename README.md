@@ -1,16 +1,20 @@
-# SkripsiAI — AI Reviewer Skripsi & Proposal (Laravel 13)
+# SkripsiAI — AI Reviewer Skripsi & Proposal (Laravel 12+)
 
-Aplikasi Laravel yang membantu mahasiswa menyusun skripsi/proposal: AI menganalisis dokumen DOCX, memberi **highlight warna** pada teks bermasalah, memberi **komentar + saran revisi**, dan menerima input suara otomatis (**auto voice input**). Provider AI bisa **apa pun** — Gemini, 9Router, OpenAI, Anthropic, Groq, Mistral, Ollama lokal, atau API kustom.
+Aplikasi Laravel yang membantu mahasiswa menyusun skripsi/proposal: AI menganalisis dokumen DOCX, memberi **highlight warna** pada teks bermasalah, memberi **komentar + saran revisi**, dan menerima input suara otomatis (**auto voice input**).
 
-> Dibangun untuk Laravel 13 (PHP 8.3+). Kompatibel dengan struktur Laravel 11/12 (routing dan service container sama).
+Integrasi AI cukup **2 driver**:
+- **`gemini`** — Google Gemini (cukup `GEMINI_API_KEY`).
+- **`openai-compatible`** — **multi-API**: 9Router online, OpenRouter, DeepSeek, OpenAI, Groq, Mistral, vLLM, dll. — cukup `base_url` + `api_key` + `model`. API berformat lain tetap bisa lewat `Ai::extend()`.
+
+> Dibangun untuk Laravel 12+ (PHP 8.2+). Kompatibel dengan struktur Laravel 11/12/13 (routing dan service container sama).
 
 ## Fitur
 
 | Fitur | Cara kerja |
 | --- | --- |
 | Halaman masuk + beranda | Halaman welcome default Laravel (`Let's get started`) **diganti**: `/` kini halaman beranda yang dilindungi halaman masuk `/login` — password default **123456789** (ubah via `APP_LOGIN_PASSWORD`), sesi berbasis cookie |
-| Integrasi API AI apa pun | Driver pattern (`AiManager`) + driver `openai-compatible` untuk endpoint kompatibel OpenAI (9Router, OpenRouter, DeepSeek, vLLM, dll.) + `Ai::extend()` untuk API berformat kustom + tabel `ai_settings` agar user menambah provider dari UI/API tanpa deploy ulang |
-| Lihat model AI | `GET /api/ai/models` & tombol **Lihat Model** di beranda menampilkan daftar model tiap provider (Gemini `models/`, OpenAI-compatible `/models`, Anthropic, Ollama `/api/tags`) |
+| Integrasi AI: Gemini + multi-API | Driver pattern (`AiManager`): driver `gemini` + driver `openai-compatible` untuk 9Router & gateway lain, `Ai::extend()` untuk format kustom, tabel `ai_settings` agar user menambah provider dari beranda tanpa deploy ulang |
+| Lihat model AI | `GET /api/ai/models` & tombol **Lihat Model** di beranda menampilkan daftar model tiap provider (Gemini `models/`, openai-compatible `/models`) |
 | DOCX | Upload `.docx` → diparse per paragraf (deteksi BAB/sub-bab) → ekspor kembali `.docx` dengan warna highlight + lampiran Laporan Review AI (phpoffice/phpword) |
 | Review skripsi/proposal | Paragraf di-batch → AI menganalisis bahasa, sitasi, metodologi, struktur BAB I–V → tiap temuan jadi `Highlight` + `Comment` |
 | Tanda warna | merah = bahasa/typo/plagiarisme, kuning = tanpa sitasi, biru = metodologi, ungu = struktur, hijau = gaya akademik |
@@ -30,7 +34,7 @@ Route `routes/web.php` menggantikan halaman welcome bawaan Laravel:
 | GET | `/models` · `/models/{slug}` | (AJAX, butuh login) daftar provider / daftar model satu provider |
 | POST | `/chat` | (AJAX, butuh login) uji coba chat ke provider mana pun |
 
-Integrasi **Gemini** cukup isi `GEMINI_API_KEY` di `.env`. Integrasi **9Router online** (atau gateway kompatibel OpenAI lain): driver `openai-compatible` + base URL instance kamu (`NINEROUTER_BASE_URL`, mis. `https://instance-9router.up.railway.app/v1`) + API key dari dashboard 9Router — atau tambahkan langsung dari form "Tambah Provider" di beranda.
+Integrasi **Gemini** cukup isi `GEMINI_API_KEY` di `.env`. Integrasi **9Router online**: driver `openai-compatible` + base URL instance kamu (`NINEROUTER_BASE_URL`, mis. `https://instance-9router.up.railway.app/v1`) + API key dari dashboard 9Router — atau tambahkan langsung dari form "Tambah Provider" di beranda.
 
 ## Instalasi
 
@@ -38,7 +42,6 @@ Integrasi **Gemini** cukup isi `GEMINI_API_KEY` di `.env`. Integrasi **9Router o
 
 - PHP **8.2+** dengan ekstensi: `cli, xml, zip, gd, mbstring, curl, pdo_sqlite/pdo_mysql`
 - **Composer**
-- (Opsional) [Ollama](https://ollama.com) untuk AI lokal gratis
 
 Install Composer (kalau belum ada):
 
@@ -73,9 +76,6 @@ php artisan install:database  # atau konfigurasi .env + php artisan migrate
 # Dependensi proyek
 composer require phpoffice/phpword   # parse & export DOCX + highlight warna
 composer require guzzlehttp/guzzle    # HTTP client untuk semua driver AI (default Laravel, pastikan ada)
-
-# Opsional: Redis queue
-# composer require predis/predis
 ```
 
 > Facade `Http::` Laravel membutuhkan Guzzle (Laravel 11+ sudah include). Yang **wajib** tambahan hanya `phpoffice/phpword`.
@@ -119,7 +119,7 @@ php artisan serve       # buka http://127.0.0.1:8000 -> halaman masuk (password 
 php artisan queue:work  # WAJIB di terminal terpisah: review AI diproses via queue
 ```
 
-Minimal isi satu API key di `.env` (mis. `GEMINI_API_KEY`), isi `NINEROUTER_BASE_URL` + `NINEROUTER_API_KEY` untuk 9Router online, atau gunakan Ollama lokal gratis (`OLLAMA_*`).
+Minimal isi `GEMINI_API_KEY` di `.env`, atau isi `NINEROUTER_BASE_URL` + `NINEROUTER_API_KEY` untuk 9Router online, atau tambahkan provider kompatibel OpenAI lain dari form di beranda.
 
 ### 5. Troubleshooting instalasi
 
@@ -141,15 +141,13 @@ config/ai.php
 routes/web.php                          # halaman masuk + beranda (mengganti welcome default)
 app/Providers/AiServiceProvider.php
 app/Services/Ai/
-├── AiManager.php                  # pusat integrasi semua provider
-├── AiModelService.php              # lihat model AI tiap provider (Gemini/9Router/OpenAI/dll.)
+├── AiManager.php                  # pusat integrasi: driver gemini + openai-compatible (multi-API)
+├── AiModelService.php              # lihat model AI tiap provider (Gemini / 9Router / dll.)
 ├── AiResponse.php
 ├── Contracts/AiProviderInterface.php
 ├── Drivers/
-│   ├── OpenAiCompatibleDriver.php  # OpenAI, 9Router, Groq, Mistral, DeepSeek, dll.
-│   ├── AnthropicDriver.php
-│   ├── GeminiDriver.php
-│   └── OllamaDriver.php
+│   ├── GeminiDriver.php            # Google Gemini (GEMINI_API_KEY)
+│   └── OpenAiCompatibleDriver.php  # MULTI-API: 9Router, OpenRouter, OpenAI, DeepSeek, dll.
 ├── Facades/Ai.php
 └── Prompts/ThesisReviewPrompts.php
 app/Services/Docx/
@@ -196,9 +194,9 @@ curl -F "audio=@catatan.webm" -F "document_id=1" -F "section_index=4" \
      http://localhost:8000/api/voice/transcribe
 ```
 
-## Menambahkan API AI baru
+## Menambahkan provider AI
 
-Cara 1 — endpoint kompatibel OpenAI (9Router, DeepSeek, OpenRouter, vLLM, LiteLLM, dst.), tanpa kode — dari beranda (form "Tambah Provider") atau via API:
+Semua provider dengan **endpoint kompatibel OpenAI** (9Router, OpenRouter, DeepSeek, vLLM, LiteLLM, dst.) tidak perlu kode — tambahkan dari beranda (form "Tambah Provider") atau via API:
 
 ```bash
 # Contoh: 9Router online
@@ -209,7 +207,7 @@ curl -X POST http://localhost:8000/api/ai/providers \
        "api_key":"sk-...","is_default":true}'
 ```
 
-Cara 2 — API dengan format khusus, satu closure di `AppServiceProvider::boot()`:
+API dengan format lain, satu closure di `AppServiceProvider::boot()`:
 
 ```php
 use App\Services\Ai\Facades\Ai;
