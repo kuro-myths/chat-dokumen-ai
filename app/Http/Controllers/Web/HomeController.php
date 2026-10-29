@@ -78,8 +78,13 @@ class HomeController extends Controller
         $messages = array_merge(
             [[
                 'role' => 'system',
-                'content' => 'Kamu adalah Kuro AI, asisten akademik berbahasa Indonesia yang ramah. '
-                    .'Jawab ringkas, jelas, dan membantu untuk penyusunan skripsi/proposal.',
+                // Chat santai — JANGAN bahasa akademik/skripsi. Prompt akademik
+                // khusus untuk review dokumen ada di ThesisReviewPrompts.
+                'content' => 'Kamu adalah Kuro AI, teman ngobrol berbahasa Indonesia yang ramah dan santai. '
+                    .'Jawab ringkas, jelas, dan santai seperti chat dengan teman — pakai bahasa '
+                    .'sehari-hari (boleh 'kamu', 'aku', sedikit emoji), HINDARI bahasa formal akademik '
+                    .'atau istilah skripsi kecuali user memintanya. Tetap akurat dan membantu untuk '
+                    .'topik apa pun yang ditanya user.',
             ]],
             $history,
             [['role' => 'user', 'content' => $data['message']]],
