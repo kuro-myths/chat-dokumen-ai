@@ -1,3 +1,4 @@
+
 /* ============================================================
    Kuro AI — logika beranda (public/js/kuro.js)
    Dimuat di beranda saja (satu sumber, tidak ada script inline).
@@ -598,7 +599,6 @@
                 '<small>' + esc(m.name || modelMeta(m.id).family || '') +
                 (m.price ? ' · $' + m.price.input + ' / $' + m.price.output + ' per 1jt token' : '') +
                 '</small></span>' + tierBadge(t);
-            main.addEventListener('click', function () {
                 currentModel = m.id;
                 saveModelChoice();
                 updateModelName();
@@ -801,7 +801,15 @@
                 model: currentModel, // model dari dropdown model (null = default provider)
                 history: history.slice(0, -1).slice(-20)
             })
-        }).then(function (r) { return r.json(); }).then(function (data) {
+        }).then(function (r) {
+            if (r.status === 419) throw new Error('Sesi sudah berakhir (server baru di-deploy ulang). Muat ulang halaman (tekan F5 / Ctrl+F5), masuk lagi bila diminta, lalu kirim ulang pesanmu.');
+            if (!r.ok) {
+                return r.json().catch(function () { return null; }).then(function (j) {
+                    throw new Error((j && (j.message || j.error)) || ('Server menolak permintaan (HTTP ' + r.status + ').'));
+                });
+            }
+            return r.json();
+        }).then(function (data) {
             hideTyping();
             if (data.ok && data.content) {
                 history.push({role: 'assistant', content: data.content});
@@ -1191,7 +1199,6 @@
                     setConvs(convs);
                     apply(msgs);
                 })
-                .catch(function () { apply(item.messages || []); });
             return;
         }
         apply(item.messages || []);
@@ -1430,3 +1437,593 @@
     });
 
     // ---------- Mode Berbicara (AI membacakan jawaban — TTS browser) ----------
+    var speakMode = false;
+    try { speakMode = localStorage.getItem('kuro_speak') === 'on'; } catch (e) {}
+    var speakState = document.getElementById('am-speak-state');
+
+    function applySpeak() {
+        speakState.textContent = speakMode ? 'Nyala' : 'Mati';
+        speakState.classList.toggle('on', speakMode);
+    }
+    function speak(text) {
+        if (!speakMode || !window.speechSynthesis || !text) return;
+        try {
+            window.speechSynthesis.cancel();
+            var u = new SpeechSynthesisUtterance(String(text).slice(0, 4000));
+            u.lang = 'id-ID';
+            u.rate = 1;
+            var voices = window.speechSynthesis.getVoices() || [];
+            for (var i = 0; i < voices.length; i++) {
+                if (/id[-_]ID|Indones/i.test(voices[i].lang + ' ' + voices[i].name)) { u.voice = voices[i]; break; }
+            }
+            window.speechSynthesis.speak(u);
+        } catch (e) {}
+    }
+    applySpeak();
+    if (window.speechSynthesis) { try { window.speechSynthesis.getVoices(); } catch (e) {} }
+    document.getElementById('am-speak').addEventListener('click', function () {
+        attachMenu.classList.remove('open');
+        speakMode = !speakMode;
+        try { localStorage.setItem('kuro_speak', speakMode ? 'on' : 'off'); } catch (e) {}
+        applySpeak();
+        if (speakMode) { speak('Mode berbicara aktif.'); }
+        else if (window.speechSynthesis) { try { window.speechSynthesis.cancel(); } catch (e) {} }
+    });
+    document.getElementById('btn-doc-upload').addEventListener('click', function () { attachInput.click(); });
+    attachInput.addEventListener('change', function () {
+        var file = attachInput.files[0];
+        if (!file) return;
+        uploadDoc(file);
+        attachInput.value = '';
+    });
+
+    function uploadDoc(file) {
+        if (!/\.docx$/i.test(file.name)) { kuroAlert('File harus berformat .docx (Word 2007 ke atas). Simpan ulang sebagai ".docx" bila file masih ".doc".'); return; }
+        if (file.size > 20 * 1024 * 1024) {
+            kuroAlert('Ukuran file ' + (file.size / 1048576).toFixed(1) + ' MB — maksimal 20 MB. Kompres gambar di dalam dokumen lalu unggah ulang.');
+            return;
+        }
+        kuroThinking(true, 'Kuro mengimpor dokumen… 📥');
+        var fd = new FormData();
+        fd.append('document', file);
+        fd.append('type', 'skripsi');
+        fetch('/api/documents', {method: 'POST', headers: {'Accept': 'application/json'}, body: fd})
+            .then(function (r) {
+                if (r.ok) return r.json();
+                // Baca detail error dari server supaya pesannya jelas (bukan "gagal" generik).
+                return r.json().catch(function () { return null; }).then(function (j) {
+                    var m = 'Unggah gagal (HTTP ' + r.status + ').';
+                    if (j && j.errors) {
+                        for (var k in j.errors) { if (j.errors[k] && j.errors[k][0]) { m = j.errors[k][0]; break; } }
+                    } else if (j && j.message) {
+                        m = j.message;
+                    }
+                    if (r.status === 413 || /upload_max|post_max|too large|lebih besar/i.test(m)) {
+                        m = 'File terlalu besar untuk server (melebihi batas unggah PHP). Kecilkan dokumen (kompres gambar) lalu coba lagi.';
+                    } else if (r.status === 422 && /document.*required|No file/i.test(m)) {
+                        m = 'File tidak sampai ke server — kemungkinan melebihi batas unggah. Coba file .docx yang lebih kecil.';
+                    }
+                    throw new Error(m);
+                });
+            })
+            .then(function (data) {
+                docModal.classList.remove('open');
+                kuroThinking(false, 'Dokumen terimpor ✅ mulai review…');
+                loadDocs();
+                var id = data.document ? data.document.id : null;
+                if (id) {
+                    openDoc(id);
+                    startReview(id);
+                }
+            })
+            .catch(function (e) {
+                kuroThinking(false);
+                kuroAlert(e.message || 'Unggah gagal — periksa koneksi lalu coba lagi.');
+            });
+    }
+
+    // ---------- Split-screen: buka dokumen ----------
+    function markHighlights(bodyHtml, highlights) {
+        var html = bodyHtml;
+        highlights.forEach(function (h) {
+            if (!h.quote) return;
+            var q = esc(h.quote);
+            if (html.indexOf(q) === -1) return;
+            var mark = '<mark class="hl-mark c-' + esc(h.color || 'green') + '" title="' +
+                esc((h.comment || '') + (h.suggestion ? ' → ' + h.suggestion : '')) + '">' + q + '</mark>';
+            html = html.split(q).join(mark);
+        });
+        return html;
+    }
+
+    function renderDocView(doc) {
+        document.getElementById('dp-title').textContent = doc.title || ('Dokumen #' + doc.id);
+        var badge = document.getElementById('dp-status');
+        badge.className = 'badge ' + esc(doc.status || 'uploaded');
+        badge.textContent = doc.status || 'uploaded';
+        document.getElementById('dp-export').href = '/api/documents/' + doc.id + '/export';
+
+        var view = document.getElementById('dp-view');
+        view.innerHTML = '';
+        var sections = (doc.sections || []).slice().sort(function (a, b) { return (a.index || 0) - (b.index || 0); });
+        if (!sections.length) {
+            view.innerHTML = '<p class="dv-empty">Dokumen ini belum memiliki konten teks.</p>';
+        }
+        sections.forEach(function (s) {
+            if (s.heading) {
+                var h = document.createElement(s.level === 1 ? 'div' : (s.level === 2 ? 'div' : 'div'));
+                h.className = s.level === 1 ? 'dv-h1' : (s.level === 2 ? 'dv-h2' : 'dv-h3');
+                h.textContent = s.heading;
+                view.appendChild(h);
+            }
+            if (s.body) {
+                var p = document.createElement('p');
+                p.innerHTML = markHighlights(esc(s.body), doc.highlights || []);
+                view.appendChild(p);
+            }
+        });
+
+        renderFindings(doc.highlights || [], doc.id);
+        setMode('doc');
+    }
+
+    function renderFindings(list, docId) {
+        var box = document.getElementById('dp-findings');
+        box.innerHTML = '<h3><i class="fa-solid fa-magnifying-glass"></i>Temuan AI <span class="chip">' + list.length + '</span></h3>';
+        if (!list.length) {
+            box.innerHTML += '<p class="muted" style="font-size:.8rem">Belum ada temuan — jalankan "Periksa AI".</p>';
+            return;
+        }
+
+        // Tombol "Terima semua revisi" (terapkan sekaligus semua saran AI yang pending).
+        var pending = list.filter(function (h) { return !h.status || h.status === 'pending'; }).length;
+        if (pending > 1) {
+            var allBtn = document.createElement('button');
+            allBtn.type = 'button';
+            allBtn.className = 'btn small doc-find-all';
+            allBtn.innerHTML = '<i class="fa-solid fa-check-double"></i> Terima semua revisi (' + pending + ')';
+            allBtn.addEventListener('click', function () {
+                allBtn.disabled = true;
+                fetch('/api/documents/' + docId + '/highlights/accept-all', {
+                    method: 'POST',
+                    headers: {'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF}
+                }).then(function (r) { return r.json(); }).then(function (data) {
+                    kuroToast('✔ ' + (data.message || 'Semua revisi diterapkan.'), 'ok');
+                    openDoc(docId);
+                }).catch(function () { allBtn.disabled = false; });
+            });
+            box.appendChild(allBtn);
+        }
+
+        list.slice(0, 40).forEach(function (h) {
+            var div = document.createElement('div');
+            div.className = 'hl-item c-' + esc(h.color || 'green');
+            div.innerHTML =
+                '<div class="q">' + esc(h.quote) + '</div>' +
+                (h.comment ? '<div class="c">💬 ' + esc(h.comment) + '</div>' : '') +
+                (h.suggestion ? '<div class="c">✍️ ' + esc(h.suggestion) + '</div>' : '') +
+                (h.status && h.status !== 'pending' ? '<div class="c">Status: ' + esc(h.status) + '</div>' : '') +
+                '<div class="hl-act">' +
+                '<button class="btn small ok-btn"><i class="fa-solid fa-check"></i> Terima</button>' +
+                '<button class="btn small ghost no-btn"><i class="fa-solid fa-xmark"></i> Tolak</button>' +
+                '</div>';
+            div.querySelector('.ok-btn').addEventListener('click', function () {
+                actHighlight(h.id, 'accept', docId);
+            });
+            div.querySelector('.no-btn').addEventListener('click', function () {
+                actHighlight(h.id, 'reject', docId);
+            });
+            box.appendChild(div);
+        });
+    }
+
+    function actHighlight(id, act, docId) {
+        fetch('/api/highlights/' + id + '/' + act, {
+            method: 'POST',
+            headers: {'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF}
+        }).then(function () { openDoc(docId); });
+    }
+
+    function openDoc(id) {
+        currentDocId = id;
+        kuroThinking(true, 'Kuro membuka dokumen… 📄');
+        fetch('/api/documents/' + id, {headers: {'Accept': 'application/json'}})
+            .then(function (r) { return r.json(); })
+            .then(function (doc) {
+                renderDocView(doc);
+                kuroThinking(false);
+            })
+            .catch(function (e) { kuroThinking(false); kuroAlert(e.message); });
+    }
+
+    document.getElementById('dp-close').addEventListener('click', function () {
+        currentDocId = null;
+        setMode(history.length ? 'chat' : 'landing');
+    });
+
+    // ---------- Periksa AI + polling ----------
+    document.getElementById('dp-review').addEventListener('click', function () {
+        if (currentDocId) startReview(currentDocId);
+    });
+
+    function startReview(id) {
+        kuroThinking(true, 'Kuro sedang membaca dokumen… 📄');
+        fetch('/api/documents/' + id + '/review', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': CSRF
+            },
+            body: JSON.stringify({
+                provider: currentProvider,
+                model: currentModel // model terpilih di dropdown (null = default provider)
+            })
+        }).then(function (r) { return r.json(); }).then(function () {
+            loadDocs();
+            pollReview(id);
+        }).catch(function (e) { kuroThinking(false); kuroAlert(e.message); });
+    }
+
+    function pollReview(id) {
+        if (polls[id]) return;
+        var tries = 0;
+        polls[id] = setInterval(function () {
+            tries++;
+            fetch('/api/documents/' + id + '/review', {headers: {'Accept': 'application/json'}})
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data.status === 'reviewing') {
+                        if (tries > 15) {
+                            clearInterval(polls[id]);
+                            polls[id] = null;
+                            kuroThinking(false, 'Review masih diproses 😿');
+                        }
+                        return;
+                    }
+                    clearInterval(polls[id]);
+                    polls[id] = null;
+                    loadDocs();
+                    if (currentDocId === id) {
+                        if (data.status === 'reviewed') {
+                            kuroThinking(false, 'Review selesai! ✅ (' + (data.highlights_count || 0) + ' temuan)');
+                            openDoc(id);
+                        } else {
+                            kuroThinking(false, 'Review gagal 😿');
+                            openDoc(id);
+                        }
+                    }
+                })
+                .catch(function () {});
+        }, 4000);
+    }
+
+    // ---------- Sinkron Router & Mode AI (Gemini / Manual) ----------
+    var syncModal = document.getElementById('sync-modal');
+
+    function applySyncMode() {
+        var mode = document.getElementById('sync-mode').value;
+        document.getElementById('sync-gemini').classList.toggle('show', mode === 'gemini');
+        document.getElementById('sync-manual').classList.toggle('show', mode === 'manual');
+    }
+
+    function fillSyncStatus(router) {
+        var dotOn = document.getElementById('dot-online');
+        var dotLc = document.getElementById('dot-local');
+        var stOn = document.getElementById('st-online');
+        var stLc = document.getElementById('st-local');
+        var r = router || {};
+        function txt(x) { return x && x.reachable ? 'aktif (' + x.latency_ms + ' ms)' : 'tidak terjangkau'; }
+        stOn.textContent = r.online ? txt(r.online) : 'tidak dikonfigurasi';
+        stLc.textContent = r.local ? txt(r.local) : '—';
+        dotOn.className = 'sync-dot ' + (r.online && r.online.reachable ? 'on' : 'off');
+        dotLc.className = 'sync-dot ' + (r.local && r.local.reachable ? 'on' : 'off');
+    }
+
+    function loadSetup() {
+        fetch('/api/ai/setup', {headers: {'Accept': 'application/json'}})
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!data.ok) return;
+                document.getElementById('sync-mode').value = data.mode || 'gemini';
+                applySyncMode();
+                document.getElementById('gemini-model-info').textContent =
+                    'Model otomatis: ' + (data.gemini.model || 'gemini-3.8-flash') + ' — tidak perlu menulis manual.';
+                document.getElementById('manual-base').value = data.manual.base_url || '';
+                document.getElementById('manual-model-info').textContent =
+                    'Model otomatis: ' + (data.manual.model || 'dari hasil sinkron router') + ' — tidak perlu menulis manual.';
+                document.getElementById('setup-msg').textContent = data.gemini.api_key_set
+                    ? 'Key Gemini sudah tersimpan — isi ulang hanya untuk mengganti.'
+                    : 'Key Gemini belum diisi (ambil di aistudio.google.com/api-keys).';
+            })
+            .catch(function () {});
+    }
+
+    function loadRouterStatus() {
+        fetch('/api/ai/router/status', {headers: {'Accept': 'application/json'}})
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                fillSyncStatus(data.router);
+                var sel = document.getElementById('manual-scope');
+                if (data.router && data.router.active_scope) sel.value = data.router.active_scope;
+                var msg = document.getElementById('sync-msg');
+                if (data.synced_at) {
+                    msg.textContent = 'Sinkron terakhir: ' + data.synced_at
+                        + ' — ' + (data.models_cached ? data.models_cached.length : 0) + ' model tersimpan.';
+                } else {
+                    msg.textContent = 'Belum pernah sinkron — tekan "Sinkron Sekarang".';
+                }
+            })
+            .catch(function () {});
+    }
+
+    document.getElementById('btn-open-sync').addEventListener('click', function () {
+        provModal.classList.remove('open');
+        syncModal.classList.add('open');
+        if (isMobile()) shell.classList.remove('sb-open-m');
+        loadSetup();
+        loadRouterStatus();
+    });
+    document.getElementById('btn-sync-close').addEventListener('click', function () { syncModal.classList.remove('open'); });
+    syncModal.addEventListener('click', function (e) { if (e.target === this) syncModal.classList.remove('open'); });
+
+    document.getElementById('sync-mode').addEventListener('change', applySyncMode);
+
+    document.getElementById('manual-scope').addEventListener('change', function () {
+        var base = document.getElementById('manual-base');
+        if (this.value === 'local') base.value = 'http://localhost:3001/v1';
+    });
+
+    document.getElementById('btn-router-status').addEventListener('click', loadRouterStatus);
+
+    document.getElementById('btn-router-sync').addEventListener('click', function () {
+        var msg = document.getElementById('sync-msg');
+        msg.textContent = 'Menyinkronkan…';
+        var prefer = document.getElementById('manual-scope').value; // online | local
+        // Base URL + API key dikirim langsung — sinkron tidak lagi bergantung
+        // pada MAXROUTER_ONLINE_URL di .env. Berlaku utk online & lokal.
+        fetch('/api/ai/router/sync', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF},
+            body: JSON.stringify({
+                prefer: prefer,
+                base_url: document.getElementById('manual-base').value.trim() || null,
+                api_key: document.getElementById('manual-key').value.trim() || null
+            })
+        }).then(function (r) { return r.json(); }).then(function (data) {
+            if (data.ok) {
+                msg.textContent = '✔ ' + data.message;
+                if (data.base_url) document.getElementById('manual-base').value = data.base_url;
+                renderModelList(data.models);
+                modelCache = {}; // paksa muat ulang daftar model di dropdown composer
+                loadProviderModels(currentProvider, true);
+                loadProviders();
+                loadRouterStatus();
+            } else {
+                msg.textContent = '✗ ' + (data.error || 'Gagal sinkron — cek URL / jalankan router lokal.');
+            }
+        }).catch(function (e) { msg.textContent = '✗ ' + e.message; });
+    });
+
+    function postSetup() {
+        var body = {
+            mode: document.getElementById('sync-mode').value,
+            gemini_api_key: document.getElementById('gemini-key').value.trim() || null,
+            manual_base_url: document.getElementById('manual-base').value.trim() || null,
+            manual_api_key: document.getElementById('manual-key').value.trim() || null
+        };
+        return fetch('/api/ai/setup', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF},
+            body: JSON.stringify(body)
+        }).then(function (r) { return r.json(); });
+    }
+
+    document.getElementById('btn-setup-save').addEventListener('click', function () {
+        var msg = document.getElementById('setup-msg');
+        postSetup().then(function (data) {
+            if (data.ok) {
+                msg.textContent = '✔ ' + data.message;
+                document.getElementById('gemini-key').value = '';
+                document.getElementById('manual-key').value = '';
+                currentProvider = data.mode;
+                updateProvName();
+                loadProviders();
+                kuroThinking(false, 'Mode AI tersimpan ✨');
+            } else {
+                msg.textContent = '✗ ' + (data.message || 'Gagal menyimpan setup.');
+            }
+        }).catch(function (e) { msg.textContent = '✗ ' + e.message; });
+    });
+
+    // ---------- Tes key Gemini langsung ke Google (simpan otomatis bila valid) ----------
+    document.getElementById('btn-test-gemini').addEventListener('click', function () {
+        var msg = document.getElementById('test-gemini-msg');
+        var keyInput = document.getElementById('gemini-key');
+        var key = keyInput.value.trim();
+        if (!key) {
+            msg.textContent = 'Tempel key kamu di kolom API Key Gemini dulu — lalu tekan tombol ini.';
+            return;
+        }
+        msg.textContent = 'Menguji key ke Google…';
+        fetch('/api/ai/setup/test-gemini', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF},
+            body: JSON.stringify({api_key: key})
+        }).then(function (r) { return r.json(); }).then(function (data) {
+            if (data.ok) {
+                msg.textContent = '✔ ' + data.message;
+                keyInput.value = '';
+                document.getElementById('setup-msg').textContent = 'Key Gemini sudah tersimpan & teruji ✅';
+                currentProvider = 'gemini';
+                loadProviders();
+            } else {
+                msg.textContent = '✗ ' + (data.message || 'Key ditolak Google — salin ulang penuh dari aistudio.google.com/api-keys.');
+            }
+        }).catch(function (e) { msg.textContent = '✗ ' + e.message; });
+    });
+
+    // ---------- Daftar model: pencarian + dropdown (gratis / berbayar) ----------
+    var availableModels = [];
+
+    function openModelDrop(open) {
+        var d = document.getElementById('model-drop');
+        if (d) d.classList.toggle('open', !!open);
+    }
+
+    function copyModelId(id) {
+        var done = function () { kuroToast('Model "' + id + '" disalin ke clipboard', 'ok'); };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(id).then(done, done);
+        } else {
+            var ta = document.createElement('textarea');
+            ta.value = id;
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); } catch (e) {}
+            document.body.removeChild(ta);
+            done();
+        }
+    }
+
+    // Render ulang isi dropdown mengikuti kata kunci pencarian + filter tier
+    function renderModelDrop() {
+        var box = document.getElementById('model-list');
+        var search = document.getElementById('model-search');
+        var tierSel = document.getElementById('model-tier');
+        var q = (search ? search.value : '').toLowerCase().trim();
+        var tier = tierSel ? tierSel.value : 'all';
+        var n = 0;
+        box.innerHTML = '';
+        availableModels.filter(function (m) { return chatCapable(m.id); }).forEach(function (m) {
+            var t = m.tier || 'unknown';
+            if (tier !== 'all' && t !== tier) return;
+            if (q && String(m.id).toLowerCase().indexOf(q) === -1) return;
+            n++;
+            var row = document.createElement('button');
+            row.type = 'button';
+            row.className = 'model-item';
+            if (m.note) row.title = m.note;
+            var badge = document.createElement('span');
+            badge.className = t === 'free' ? 'badge-free' : (t === 'paid' ? 'badge-paid' : 'badge-unknown');
+            badge.textContent = t === 'free' ? 'GRATIS' : (t === 'paid' ? 'BERBAYAR' : '?');
+            var code = document.createElement('code');
+            code.textContent = m.id;
+            var cp = document.createElement('span');
+            cp.className = 'model-copy';
+            cp.innerHTML = '<i class="fa-regular fa-copy"></i>';
+            row.appendChild(badge);
+            row.appendChild(code);
+            if (m.price) {
+                var price = document.createElement('span');
+                price.className = 'model-price';
+                price.textContent = '$' + m.price.input + ' / $' + m.price.output + ' per 1jt token';
+                row.appendChild(price);
+            }
+            row.appendChild(cp);
+            row.addEventListener('click', function () { copyModelId(m.id); });
+            box.appendChild(row);
+        });
+        if (!n) {
+            var empty = document.createElement('p');
+            empty.className = 'model-empty';
+            empty.textContent = availableModels.length
+                ? 'Tidak ada model yang cocok dengan pencarian.'
+                : 'Belum ada model — tekan "Muat Daftar Model" dulu.';
+            box.appendChild(empty);
+        }
+    }
+
+    function renderModelList(models) {
+        availableModels = models || [];
+        var count = document.getElementById('model-count');
+        var free = 0, paid = 0, unknown = 0;
+        availableModels.forEach(function (m) {
+            var t = m.tier || 'unknown';
+            if (t === 'free') free++; else if (t === 'paid') paid++; else unknown++;
+        });
+        count.textContent = '🟢 ' + free + ' gratis • 🔴 ' + paid + ' berbayar' + (unknown ? ' • ⚪ ' + unknown + ' belum diketahui' : '');
+        var search = document.getElementById('model-search');
+        var tierSel = document.getElementById('model-tier');
+        if (search) search.value = '';
+        if (tierSel) tierSel.value = 'all';
+        renderModelDrop();
+        openModelDrop(true);
+    }
+
+    var modelSearchInput = document.getElementById('model-search');
+    var modelTierSel = document.getElementById('model-tier');
+    if (modelSearchInput) {
+        modelSearchInput.addEventListener('focus', function () { if (availableModels.length) openModelDrop(true); });
+        modelSearchInput.addEventListener('input', function () {
+            if (!availableModels.length) return;
+            openModelDrop(true);
+            renderModelDrop();
+        });
+    }
+    if (modelTierSel) {
+        modelTierSel.addEventListener('change', function () {
+            if (!availableModels.length) return;
+            openModelDrop(true);
+            renderModelDrop();
+        });
+    }
+    // Klik di luar area pencarian model → tutup dropdown
+    document.addEventListener('click', function (e) {
+        var d = document.getElementById('model-drop');
+        if (d && !d.contains(e.target)) openModelDrop(false);
+    });
+
+    document.getElementById('btn-model-list').addEventListener('click', function () {
+        var count = document.getElementById('model-count');
+        var key = document.getElementById('gemini-key').value.trim();
+        var slug = document.getElementById('sync-mode').value === 'gemini' ? 'gemini' : 'manual';
+        count.textContent = 'Memuat model…';
+        document.getElementById('model-list').innerHTML = '<p class="model-empty">Memuat daftar model…</p>';
+        openModelDrop(true);
+
+        function go() {
+            fetch('/api/ai/models/' + slug, {headers: {'Accept': 'application/json'}})
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data.ok) {
+                        renderModelList(data.models);
+                        if (data.pricing_source) count.title = 'Sumber label: ' + data.pricing_source;
+                    } else {
+                        count.textContent = '✗ ' + (data.error || 'Gagal memuat daftar model.');
+                        document.getElementById('model-list').innerHTML =
+                            '<p class="model-empty">✗ ' + esc(data.error || 'Gagal memuat daftar model.') + '</p>';
+                    }
+                })
+                .catch(function (e) {
+                    count.textContent = '✗ ' + e.message;
+                    document.getElementById('model-list').innerHTML =
+                        '<p class="model-empty">✗ ' + esc(e.message) + '</p>';
+                });
+        }
+
+        // Mode Gemini + kolom key terisi → simpan dulu supaya tidak "belum dikonfigurasi".
+        if (slug === 'gemini' && key) {
+            postSetup().then(function (d) {
+                if (d.ok) {
+                    document.getElementById('gemini-key').value = '';
+                    loadProviders();
+                }
+                go();
+            }).catch(function () { go(); });
+        } else {
+            go();
+        }
+    });
+
+    // ---------- Init ----------
+    loadProviders();
+    loadDocs();
+    renderChat();
+    renderSideConvs();
+    fetchConvs();
+    restoreCurrent();
+})();
+
+
+

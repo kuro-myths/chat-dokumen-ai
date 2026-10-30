@@ -1,3 +1,4 @@
+
 @extends('layouts.app')
 
 @section('title', 'Beranda — Kuro AI')
@@ -314,8 +315,9 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('js/kuro.js') }}?v=20261030-4"></script>
+<script src="{{ asset('js/kuro.js') }}?v=20261030-5"></script>
 @endpush
+
 
 
 
