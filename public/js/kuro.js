@@ -1765,6 +1765,37 @@
             });
     }
 
+    // ---------- Animasi "Kuro membaca": garis warna menyapu + kursor kucing berjalan ----------
+    // Selama review berjalan, seekor kucing 🐱 jalan menyusuri dokumen
+    // dengan garis gradasi ungu-biru — menandakan bagian yang sedang dibaca.
+    var readBeam = null;
+    var readBeamTimer = null;
+
+    function startReadAnimation() {
+        var view = document.getElementById('dp-view');
+        if (!view) return;
+        stopReadAnimation();
+        readBeam = document.createElement('div');
+        readBeam.className = 'doc-readline';
+        readBeam.innerHTML = '<span class="dr-cat">🐱</span>';
+        view.appendChild(readBeam);
+        updateReadBeamHeight();
+        readBeamTimer = setInterval(updateReadBeamHeight, 1500);
+    }
+
+    function updateReadBeamHeight() {
+        var view = document.getElementById('dp-view');
+        if (view && readBeam) {
+            view.style.setProperty('--doc-h', Math.max(view.scrollHeight - 6, 200) + 'px');
+        }
+    }
+
+    function stopReadAnimation() {
+        if (readBeamTimer) { clearInterval(readBeamTimer); readBeamTimer = null; }
+        if (readBeam && readBeam.parentNode) readBeam.parentNode.removeChild(readBeam);
+        readBeam = null;
+    }
+
     // ---------- Tab panel dokumen: Dokumen / Temuan AI / Komentar ----------
     // Temuan & komentar TIDAK lagi menumpuk di bawah dokumen (dulu memakan
     // 42% tinggi panel & menyulitkan scroll) — kini masing-masing punya tab
@@ -1861,21 +1892,25 @@
 
         var view = document.getElementById('dp-view');
         view.innerHTML = '';
+        // Tampilan ala file Word (.docx): konten dibungkus "lembar kertas A4".
+        var page = document.createElement('div');
+        page.className = 'doc-page';
+        view.appendChild(page);
         var sections = (doc.sections || []).slice().sort(function (a, b) { return (a.index || 0) - (b.index || 0); });
         if (!sections.length) {
-            view.innerHTML = '<p class="dv-empty">Dokumen ini belum memiliki konten teks.</p>';
+            page.innerHTML = '<p class="dv-empty">Dokumen ini belum memiliki konten teks.</p>';
         }
         sections.forEach(function (s) {
             if (s.heading) {
                 var h = document.createElement(s.level === 1 ? 'div' : (s.level === 2 ? 'div' : 'div'));
                 h.className = s.level === 1 ? 'dv-h1' : (s.level === 2 ? 'dv-h2' : 'dv-h3');
                 h.textContent = s.heading;
-                view.appendChild(h);
+                page.appendChild(h);
             }
             if (s.body) {
                 var p = document.createElement('p');
                 p.innerHTML = markHighlights(esc(s.body), doc.highlights || []);
-                view.appendChild(p);
+                page.appendChild(p);
             }
         });
 
@@ -1883,6 +1918,7 @@
         renderFindings(doc.highlights || [], doc.id);
         renderComments(doc.comments || [], doc.id);
         renderReviewSummary(doc);
+        if ((doc.status || '') === 'reviewing') startReadAnimation(); else stopReadAnimation();
         setMode('doc');
     }
 
@@ -2018,6 +2054,7 @@
     });
 
     function startReview(id) {
+        startReadAnimation();
         var st = { done: 0, total: 0, issues: 0 };
         kuroThinking(true, 'Kuro mulai membaca dokumen… 📖');
 
@@ -2041,6 +2078,7 @@
                 if (!res.ok || res.j.status === 'review_failed') {
                     var err = res.j.error || (res.j.summary && res.j.summary.error) || res.j.message || '';
                     kuroThinking(false);
+                    stopReadAnimation();
                     kuroAlert('Review gagal 😿 — ' + (err || 'cek provider AI & API Key di menu API Key, lalu coba lagi.'), 'error');
                     if (currentDocId === id) openDoc(id);
                     return;
@@ -2048,6 +2086,7 @@
                 if (res.j.status === 'reviewed') {
                     var n = res.j.highlights_count != null ? res.j.highlights_count : ((res.j.progress && res.j.progress.issues) || 0);
                     showDocTab('find');
+                    stopReadAnimation();
                     var s = res.j.summary || {};
                     var skor = (s.score != null) ? '\nSkor AI: ' + s.score + '/100' : '';
                     var overall = s.overall ? '\n\n' + s.overall : '';
@@ -2102,6 +2141,7 @@
                         } else {
                             var err = data.summary && data.summary.error ? data.summary.error : '';
                             kuroThinking(false);
+                            stopReadAnimation();
                             kuroAlert('Review gagal 😿' + (err ? ' — ' + err : ' — cek provider AI & API Key di menu API Key, lalu coba lagi.'), 'error');
                             openDoc(id);
                         }
