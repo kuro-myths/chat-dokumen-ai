@@ -60,6 +60,40 @@ class DocumentController extends Controller
         ], 201);
     }
 
+    /**
+     * Impor ulang file sumber yang sudah tersimpan — menyelamatkan dokumen
+     * yang macet di status "uploaded" (0 paragraf) tanpa perlu unggah ulang.
+     */
+    public function reimport(Document $document, DocxParserService $parser): JsonResponse
+    {
+        if (!$document->source_path || !Storage::disk('local')->exists($document->source_path)) {
+            return response()->json([
+                'message' => 'File sumber tidak ada lagi di server — silakan unggah ulang dokumen.',
+                'error' => 'source file missing',
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        $document->sections()->delete();
+
+        try {
+            $count = $parser->import($document, Storage::disk('local')->path($document->source_path));
+        } catch (Throwable $e) {
+            report($e);
+
+            $document->update(['status' => 'review_failed']);
+
+            return response()->json([
+                'message' => 'Impor ulang gagal: '.$e->getMessage(),
+                'error' => $e->getMessage(),
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        return response()->json([
+            'message' => "Impor ulang berhasil ({$count} paragraf).",
+            'document' => $document->load('sections'),
+        ]);
+    }
+
     public function show(Document $document)
     {
         return $document->load([

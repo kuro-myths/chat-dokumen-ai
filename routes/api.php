@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Route;
 Route::apiResource('documents', DocumentController::class)->only(['index', 'store', 'show', 'destroy']);
 Route::post('documents/{document}/sections', [DocumentController::class, 'addSection']);
 Route::get('documents/{document}/export', [DocumentController::class, 'export']);
+Route::post('documents/{document}/reimport', [DocumentController::class, 'reimport']); // impor ulang dokumen macet
 
 // ---------- Review AI (highlight warna + revisi) ----------
 Route::post('documents/{document}/review', [ReviewController::class, 'store']);      // async (queue)
