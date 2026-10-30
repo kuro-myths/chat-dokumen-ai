@@ -38,24 +38,46 @@ class GenerateController extends Controller
             ], 422);
         }
 
-        $model = (string) ($request->input('model') ?: config('ai.gemini_image_model', 'gemini-2.5-flash-image'));
+        // Rantai model gambar: bila model pilihan pensiun / 404, otomatis
+        // coba model berikutnya sampai ada yang hidup.
+        $models = array_values(array_unique(array_filter([
+            (string) $request->input('model'),
+            (string) config('ai.gemini_image_model', ''),
+            'gemini-nano-banana-2.1',
+            'gemini-3-pro-image-preview',
+            'gemini-2.5-flash-image',
+        ])));
 
-        try {
-            $response = Http::timeout(120)
-                ->acceptJson()
-                ->withHeaders(['x-goog-api-key' => $key])
-                ->post(self::BASE."/models/{$model}:generateContent", [
-                    'contents' => [['parts' => [['text' => $prompt]]]],
-                    'generationConfig' => ['responseModalities' => ['TEXT', 'IMAGE']],
-                ]);
+        $image = null;
+        $text = '';
+        $usedModel = $models[0] ?? 'gemini-nano-banana-2.1';
+
+        foreach ($models as $model) {
+            $usedModel = $model;
+
+            try {
+                $response = Http::timeout(120)
+                    ->acceptJson()
+                    ->withHeaders(['x-goog-api-key' => $key])
+                    ->post(self::BASE."/models/{$model}:generateContent", [
+                        'contents' => [['parts' => [['text' => $prompt]]]],
+                        'generationConfig' => ['responseModalities' => ['TEXT', 'IMAGE']],
+                    ]);
+            } catch (Throwable $e) {
+                return response()->json(['ok' => false, 'error' => 'Gagal menghubungi Gemini: '.$e->getMessage()], 502);
+            }
+
+            // Model pensiun / tidak tersedia -> coba model berikutnya.
+            if ($response->status() === 404
+                || ($response->status() === 400 && preg_match('/no longer available|not found|not supported|is deprecated|pensiun/i', (string) $response->body()))) {
+                continue;
+            }
 
             if ($err = $this->mapError($response->status(), $response->json('error.message'))) {
                 return response()->json(['ok' => false, 'error' => $err], $response->status());
             }
 
             $parts = $response->json('candidates.0.content.parts', []);
-            $text = '';
-            $image = null;
 
             foreach ($parts as $part) {
                 if (! empty($part['inlineData']['data'])) {
@@ -65,22 +87,22 @@ class GenerateController extends Controller
                 }
             }
 
-            if ($image === null) {
-                $msg = trim($text) !== ''
-                    ? 'Model tidak menghasilkan gambar. Jawaban model: "'.trim($text).'" — coba deskripsi lain.'
-                    : 'Model tidak menghasilkan gambar — coba deskripsi lain.';
-                return response()->json(['ok' => false, 'error' => $msg], 502);
-            }
-
-            return response()->json([
-                'ok' => true,
-                'image' => $image,
-                'text' => trim($text),
-                'model' => $model,
-            ]);
-        } catch (Throwable $e) {
-            return response()->json(['ok' => false, 'error' => 'Gagal menghubungi Gemini: '.$e->getMessage()], 502);
+            break; // model merespons — selesai
         }
+
+        if ($image === null) {
+            $msg = trim($text) !== ''
+                ? 'Model tidak menghasilkan gambar. Jawaban model: "'.trim($text).'" — coba deskripsi lain.'
+                : 'Model tidak menghasilkan gambar — coba deskripsi lain.';
+            return response()->json(['ok' => false, 'error' => $msg], 502);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'image' => $image,
+            'text' => trim($text),
+            'model' => $usedModel,
+        ]);
     }
 
     /** POST /api/ai/generate/video — mulai operasi panjang Veo, kembalikan nama operasi. */

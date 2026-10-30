@@ -13,15 +13,31 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 /**
  * Driver Google Gemini (Google AI Studio).
  *
- * Mendukung API key format LAMA (AIza...) maupun format BARU (AQ.Ab8...)
- * yang sekarang jadi satu-satunya format yang diterbitkan AI Studio.
- * Kunci dikirim via header x-goog-api-key (cara standar Google) ke
- * endpoint NATIVE generativelanguage.googleapis.com/v1beta — key
- * format AQ. hanya diterima di jalur native, bukan OpenAI-compatible.
+ * Mendukung API key format LAMA (AIza...) maupun format BARU (AQ.Ab8...).
+ * Kunci dikirim via header x-goog-api-key ke endpoint native v1beta.
+ *
+ * FALLBACK MODEL OTOMATIS: bila model yang diminta pensiun / tidak tersedia
+ * (HTTP 404, atau 400 "no longer available"), driver TIDAK berhenti —
+ * langsung coba model cadangan berikutnya sampai ada yang hidup.
+ * Review & chat jadi kebal model pensiun (2.5 mati untuk semua project
+ * sejak Okt 2026). Model yang terbukti hidup diingat sepanjang request.
  */
 class GeminiDriver implements AiProviderInterface
 {
     protected const BASE = 'https://generativelanguage.googleapis.com/v1beta';
+
+    /** Model cadangan bila model pilihan pensiun — urut dari yang terbaru. */
+    protected const FALLBACK_MODELS = [
+        'gemini-3.8-flash',
+        'gemini-3.8-flash-lite',
+        'gemini-3.5-flash-lite',
+        'gemini-3.5-flash',
+        'gemini-4-argon',
+        'gemini-2.5-flash',
+    ];
+
+    /** Model terakhir yang terbukti hidup (cache selama request berjalan). */
+    protected static ?string $lastGoodModel = null;
 
     public function __construct(
         protected string $name,
@@ -34,40 +50,73 @@ class GeminiDriver implements AiProviderInterface
     }
 
     /**
-     * Model aktif: override per-request ($options['model'] dari dropdown
-     * model di composer) -> config provider -> default gemini-3.8-flash.
-     * gemini-2.0-flash sudah pensiun — default kini gemini-3.8-flash.
+     * Model aktif: override per-request (dropdown model) -> model yang
+     * terakhir berhasil -> config provider -> fallback terbaru.
      */
     protected function model(array $options = []): string
     {
-        return trim((string) ($options['model'] ?? ''))
-            ?: trim((string) ($this->config['model'] ?? ''))
-            ?: 'gemini-3.8-flash';
+        return $this->modelCandidates($options)[0];
     }
 
-    protected function url(string $method, array $options = []): string
+    /** Urutan kandidat model yang dicoba: pilihan user -> last good -> config -> fallback. */
+    protected function modelCandidates(array $options = []): array
     {
-        return self::BASE.'/models/'.$this->model($options).':'.$method;
+        return array_values(array_filter(array_unique([
+            trim((string) ($options['model'] ?? '')),
+            static::$lastGoodModel,
+            trim((string) ($this->config['model'] ?? '')),
+            ...self::FALLBACK_MODELS,
+        ])));
+    }
+
+    protected function url(string $method, array $options = [], ?string $model = null): string
+    {
+        return self::BASE.'/models/'.($model ?? $this->model($options)).':'.$method;
     }
 
     public function chat(array $messages, array $options = []): AiResponse
     {
-        $response = Http::timeout($options['timeout'] ?? 120)
-            ->acceptJson()
-            ->withHeaders(['x-goog-api-key' => (string) ($this->config['api_key'] ?? '')])
-            ->post($this->url('generateContent', $options), $this->payload($messages, $options));
+        foreach ($this->modelCandidates($options) as $model) {
+            $response = $this->postChat($messages, $options, $model);
 
-        // Model tertentu (mis. keluarga Gemma) tidak mendukung systemInstruction
-        // -> HTTP 400 "Developer instruction is not enabled for this model".
-        // Ulangi sekali dengan system digabung ke pesan user pertama.
-        if ($response->status() === 400 && $this->systemNotSupported((string) $response->body())) {
-            $response = Http::timeout($options['timeout'] ?? 120)
-                ->acceptJson()
-                ->withHeaders(['x-goog-api-key' => (string) ($this->config['api_key'] ?? '')])
-                ->post($this->url('generateContent', $options), $this->payload($messages, $options + ['merge_system' => true]));
+            // Model pensiun / tidak tersedia -> LANGSUNG coba model berikutnya.
+            if ($this->modelUnavailable($response)) {
+                continue;
+            }
+
+            // Model tertentu (mis. keluarga Gemma) tidak mendukung systemInstruction
+            // -> ulangi sekali dengan system digabung ke pesan user pertama.
+            if ($response->status() === 400 && $this->systemNotSupported((string) $response->body())) {
+                $response = $this->postChat($messages, $options + ['merge_system' => true], $model);
+
+                if ($this->modelUnavailable($response)) {
+                    continue;
+                }
+            }
+
+            static::$lastGoodModel = $model;
+
+            return $this->parseChat($response, $options, $model);
         }
 
-        $this->assertOk($response);
+        throw new RuntimeException(
+            'Semua model Gemini tidak tersedia / sudah pensiun (dicoba: '
+            .implode(', ', $this->modelCandidates($options))
+            .') — cek API key atau pakai mode Manual (Max Router).'
+        );
+    }
+
+    protected function postChat(array $messages, array $options, string $model): Response
+    {
+        return Http::timeout($options['timeout'] ?? 120)
+            ->acceptJson()
+            ->withHeaders(['x-goog-api-key' => (string) ($this->config['api_key'] ?? '')])
+            ->post($this->url('generateContent', $options, $model), $this->payload($messages, $options));
+    }
+
+    protected function parseChat(Response $response, array $options, string $model): AiResponse
+    {
+        $this->assertOk($response, $model);
 
         $data = $response->json();
         $parts = $data['candidates'][0]['content']['parts'] ?? [];
@@ -88,7 +137,7 @@ class GeminiDriver implements AiProviderInterface
 
             // Model menjawab tetapi tidak ada teks — biasanya model non-teks
             // (TTS / audio / image) yang dipakai untuk chat.
-            throw new RuntimeException('Model "'.$this->model($options).'" tidak menghasilkan teks — pilih model chat (bukan TTS/audio) di dropdown model.');
+            throw new RuntimeException('Model "'.$model.'" tidak menghasilkan teks — pilih model chat (bukan TTS/audio) di dropdown model.');
         }
 
         return new AiResponse(
@@ -96,16 +145,15 @@ class GeminiDriver implements AiProviderInterface
             raw: $data,
             usage: $data['usageMetadata'] ?? [],
             provider: $this->name,
-            model: $this->model($options),
+            model: $model,
         );
     }
 
     /**
-     * Ubah error Google menjadi pesan Indonesia yang jelas, bukan
-     * "server error" generik — membedakan key salah, model pensiun,
-     * atau kuota habis.
+     * Ubah error Google menjadi pesan Indonesia yang jelas — membedakan
+     * key salah, model pensiun, atau kuota habis.
      */
-    protected function assertOk(Response $response): void
+    protected function assertOk(Response $response, ?string $model = null): void
     {
         if ($response->successful()) {
             return;
@@ -114,6 +162,7 @@ class GeminiDriver implements AiProviderInterface
         $status = $response->status();
         $data = $response->json();
         $message = (string) ($data['error']['message'] ?? $response->body());
+        $model ??= $this->model();
 
         $hint = match (true) {
             $status === 400 && str_contains($message, 'API_KEY_INVALID') =>
@@ -121,7 +170,7 @@ class GeminiDriver implements AiProviderInterface
             $status === 401 || $status === 403 =>
                 'API key Gemini ditolak Google — pastikan kunci lengkap (tidak terpotong), belum dihapus, dan berasal dari AI Studio.',
             $status === 404 =>
-                'Model "'.$this->model().'" tidak tersedia / sudah pensiun — ganti model (mis. gemini-3.8-flash).',
+                'Model "'.$model.'" tidak tersedia / sudah pensiun — model lain sudah otomatis dicoba; kalau masih gagal, ganti model di dropdown.',
             $status === 429 =>
                 'Kuota Gemini habis atau terlalu banyak permintaan — tunggu sebentar, atau pakai mode Manual (Max Router).',
             default => 'Gemini error HTTP '.$status.'.',
@@ -132,24 +181,11 @@ class GeminiDriver implements AiProviderInterface
 
     public function stream(array $messages, array $options = []): \Generator
     {
-        $client = SymfonyClient::create(timeout: $options['timeout'] ?? 120);
-        $response = $this->streamRequest($client, $messages, $options);
+        foreach ($this->modelCandidates($options) as $model) {
+            $client = SymfonyClient::create(timeout: $options['timeout'] ?? 120);
+            $response = $this->streamRequest($client, $messages, $options, $model);
 
-        // Paksa header diterima supaya status HTTP bisa dicek sebelum streaming.
-        try {
-            $response->getHeaders();
-        } catch (\Throwable $e) {
-            throw new RuntimeException('Gagal menghubungi Gemini: '.$e->getMessage());
-        }
-
-        $code = (int) ($response->getInfo('http_code') ?? 200);
-        $body = $code >= 400 ? $response->getContent(false) : '';
-
-        // Model tanpa systemInstruction (mis. Gemma) -> ulangi dengan
-        // system digabung ke pesan user pertama (lihat chat()).
-        if ($code === 400 && $this->systemNotSupported($body)) {
-            $response = $this->streamRequest($client, $messages, $options + ['merge_system' => true]);
-
+            // Paksa header diterima supaya status HTTP bisa dicek sebelum streaming.
             try {
                 $response->getHeaders();
             } catch (\Throwable $e) {
@@ -158,35 +194,64 @@ class GeminiDriver implements AiProviderInterface
 
             $code = (int) ($response->getInfo('http_code') ?? 200);
             $body = $code >= 400 ? $response->getContent(false) : '';
-        }
 
-        if ($code >= 400) {
-            $message = (string) (json_decode($body, true)['error']['message'] ?? $body);
+            // Model pensiun / tidak tersedia -> coba model berikutnya.
+            if ($code === 404 || ($code === 400 && $this->bodyModelUnavailable($body))) {
+                continue;
+            }
 
-            throw new RuntimeException('Gemini streaming error HTTP '.$code.': '.mb_substr($message, 0, 300));
-        }
+            // Model tanpa systemInstruction (mis. Gemma) -> ulangi dengan
+            // system digabung ke pesan user pertama (lihat chat()).
+            if ($code === 400 && $this->systemNotSupported($body)) {
+                $response = $this->streamRequest($client, $messages, $options + ['merge_system' => true], $model);
 
-        $buffer = '';
-
-        foreach ($client->stream($response) as $chunk) {
-            $buffer .= $chunk->getContent();
-
-            while (($pos = strpos($buffer, "\n")) !== false) {
-                $line = substr($buffer, 0, $pos);
-                $buffer = substr($buffer, $pos + 1);
-
-                if (! str_starts_with(trim($line), 'data:')) {
-                    continue;
+                try {
+                    $response->getHeaders();
+                } catch (\Throwable $e) {
+                    throw new RuntimeException('Gagal menghubungi Gemini: '.$e->getMessage());
                 }
 
-                $json = json_decode(substr(trim($line), 5), true);
-                $delta = $json['candidates'][0]['content']['parts'][0]['text'] ?? '';
+                $code = (int) ($response->getInfo('http_code') ?? 200);
+                $body = $code >= 400 ? $response->getContent(false) : '';
+            }
 
-                if ($delta !== '') {
-                    yield $delta;
+            if ($code >= 400) {
+                $message = (string) (json_decode($body, true)['error']['message'] ?? $body);
+
+                throw new RuntimeException('Gemini streaming error HTTP '.$code.': '.mb_substr($message, 0, 300));
+            }
+
+            static::$lastGoodModel = $model;
+            $buffer = '';
+
+            foreach ($client->stream($response) as $chunk) {
+                $buffer .= $chunk->getContent();
+
+                while (($pos = strpos($buffer, "\n")) !== false) {
+                    $line = substr($buffer, 0, $pos);
+                    $buffer = substr($buffer, $pos + 1);
+
+                    if (! str_starts_with(trim($line), 'data:')) {
+                        continue;
+                    }
+
+                    $json = json_decode(substr(trim($line), 5), true);
+                    $delta = $json['candidates'][0]['content']['parts'][0]['text'] ?? '';
+
+                    if ($delta !== '') {
+                        yield $delta;
+                    }
                 }
             }
+
+            return; // sukses — jangan lanjut ke kandidat berikutnya
         }
+
+        throw new RuntimeException(
+            'Semua model Gemini tidak tersedia / sudah pensiun saat streaming (dicoba: '
+            .implode(', ', $this->modelCandidates($options))
+            .') — cek API key atau pakai mode Manual (Max Router).'
+        );
     }
 
     protected function payload(array $messages, array $options): array
@@ -230,9 +295,9 @@ class GeminiDriver implements AiProviderInterface
     }
 
     /** Request streaming SSE ke Gemini (dipakai juga untuk retry tanpa systemInstruction). */
-    protected function streamRequest(HttpClientInterface $client, array $messages, array $options)
+    protected function streamRequest(HttpClientInterface $client, array $messages, array $options, ?string $model = null)
     {
-        return $client->request('POST', $this->url('streamGenerateContent', $options).'?alt=sse', [
+        return $client->request('POST', $this->url('streamGenerateContent', $options, $model ?? $this->model($options)).'?alt=sse', [
             'headers' => [
                 'x-goog-api-key' => (string) ($this->config['api_key'] ?? ''),
                 'Accept' => 'application/json',
@@ -246,5 +311,24 @@ class GeminiDriver implements AiProviderInterface
     protected function systemNotSupported(string $body): bool
     {
         return str_contains($body, 'Developer instruction is not enabled');
+    }
+
+    /** True bila body error menandakan model pensiun / tidak tersedia. */
+    protected function bodyModelUnavailable(string $body): bool
+    {
+        return (bool) preg_match(
+            '/no longer available|not found|not supported|is deprecated|pensiun/i',
+            $body
+        );
+    }
+
+    /** True bila response gagal karena model pensiun -> layak coba model berikutnya. */
+    protected function modelUnavailable(Response $response): bool
+    {
+        if ($response->status() === 404) {
+            return true;
+        }
+
+        return $response->status() === 400 && $this->bodyModelUnavailable((string) $response->body());
     }
 }

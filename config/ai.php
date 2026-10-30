@@ -120,7 +120,13 @@ return [
     | Pilihan voice: Leda, Puck, Achernar, Aoede, Erinome, Kore, dll.
     */
     'tts' => [
-        'model' => env('GEMINI_TTS_MODEL', 'gemini-2.5-flash-preview-tts'),
+        'model' => env('GEMINI_TTS_MODEL', 'gemini-3.8-flash-tts'),
+        'fallback_models' => [
+            // dicoba berurutan bila model utama pensiun / tidak tersedia
+            'gemini-3.8-flash-lite-tts',
+            'gemini-3.1-flash-tts',
+            'gemini-2.5-flash-preview-tts',
+        ],
         'max_chars' => 4000,
         'default_voice' => 'anime',
 

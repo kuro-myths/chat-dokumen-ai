@@ -82,23 +82,41 @@ class VoiceController extends Controller
         }
         $preset = $voices[$voiceId];
 
-        $model = (string) config('ai.tts.model', 'gemini-2.5-flash-preview-tts');
         $voiceName = (string) ($preset['voice'] ?? 'Leda');
         $style = (string) ($preset['style'] ?? 'Read aloud in Indonesian, friendly and clear');
-
         $prompt = $style.': "'.$text.'"';
 
-        try {
-            $response = Http::timeout(90)
-                ->acceptJson()
-                ->withHeaders(['x-goog-api-key' => $key])
-                ->post(self::BASE."/models/{$model}:generateContent", [
-                    'contents' => [['parts' => [['text' => $prompt]]]],
-                    'generationConfig' => [
-                        'responseModalities' => ['AUDIO'],
-                        'speechConfig' => ['voiceConfig' => ['prebuiltVoiceConfig' => ['voiceName' => $voiceName]]],
-                    ],
-                ]);
+        // Rantai model TTS: bila model pensiun / 404, otomatis coba model
+        // berikutnya sampai ada yang hidup (2.5 pensiun sejak Okt 2026).
+        $ttsModels = array_values(array_unique(array_filter([
+            (string) config('ai.tts.model', 'gemini-3.8-flash-tts'),
+            ...(array) config('ai.tts.fallback_models', []),
+        ])));
+
+        $inline = null;
+        $usedModel = $ttsModels[0] ?? 'gemini-3.8-flash-tts';
+
+        foreach ($ttsModels as $model) {
+            try {
+                $response = Http::timeout(90)
+                    ->acceptJson()
+                    ->withHeaders(['x-goog-api-key' => $key])
+                    ->post(self::BASE."/models/{$model}:generateContent", [
+                        'contents' => [['parts' => [['text' => $prompt]]]],
+                        'generationConfig' => [
+                            'responseModalities' => ['AUDIO'],
+                            'speechConfig' => ['voiceConfig' => ['prebuiltVoiceConfig' => ['voiceName' => $voiceName]]],
+                        ],
+                    ]);
+            } catch (Throwable $e) {
+                return response()->json(['ok' => false, 'error' => 'Gagal menghubungi Gemini TTS: '.$e->getMessage()], 502);
+            }
+
+            // Model TTS pensiun / tidak tersedia -> coba model berikutnya.
+            if ($response->status() === 404
+                || ($response->status() === 400 && preg_match('/no longer available|not found|not supported|is deprecated|pensiun/i', (string) $response->body()))) {
+                continue;
+            }
 
             if ($err = $this->mapError($response->status(), $response->json('error.message'))) {
                 return response()->json(['ok' => false, 'error' => $err], $response->status());
@@ -106,37 +124,42 @@ class VoiceController extends Controller
 
             $part = $response->json('candidates.0.content.parts.0');
             $inline = $part['inlineData'] ?? null;
+            $usedModel = $model;
 
             if (! is_array($inline) || empty($inline['data'])) {
                 return response()->json(['ok' => false, 'error' => 'Model tidak menghasilkan audio — coba teks yang lebih pendek.'], 502);
             }
 
-            $mime = (string) ($inline['mimeType'] ?? 'audio/L16;rate=24000');
-
-            if (str_contains($mime, 'wav')) {
-                $audio = 'data:audio/wav;base64,'.$inline['data'];
-            } else {
-                $rate = 24000;
-                if (preg_match('/rate=(\d+)/', $mime, $m)) {
-                    $rate = (int) $m[1];
-                }
-                $wav = $this->pcmToWav(base64_decode((string) $inline['data']), $rate);
-                if ($wav === null) {
-                    return response()->json(['ok' => false, 'error' => 'Audio dari AI kosong — coba lagi.'], 502);
-                }
-                $audio = 'data:audio/wav;base64,'.base64_encode($wav);
-            }
-
-            return response()->json([
-                'ok' => true,
-                'audio' => $audio,
-                'voice' => $voiceId,
-                'label' => (string) ($preset['label'] ?? $voiceName),
-                'model' => $model,
-            ]);
-        } catch (Throwable $e) {
-            return response()->json(['ok' => false, 'error' => 'Gagal menghubungi Gemini TTS: '.$e->getMessage()], 502);
+            break; // sukses
         }
+
+        if (! is_array($inline) || empty($inline['data'])) {
+            return response()->json(['ok' => false, 'error' => 'Semua model TTS Gemini tidak tersedia / sudah pensiun — coba lagi nanti.'], 502);
+        }
+
+        $mime = (string) ($inline['mimeType'] ?? 'audio/L16;rate=24000');
+
+        if (str_contains($mime, 'wav')) {
+            $audio = 'data:audio/wav;base64,'.$inline['data'];
+        } else {
+            $rate = 24000;
+            if (preg_match('/rate=(\d+)/', $mime, $m)) {
+                $rate = (int) $m[1];
+            }
+            $wav = $this->pcmToWav(base64_decode((string) $inline['data']), $rate);
+            if ($wav === null) {
+                return response()->json(['ok' => false, 'error' => 'Audio dari AI kosong — coba lagi.'], 502);
+            }
+            $audio = 'data:audio/wav;base64,'.base64_encode($wav);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'audio' => $audio,
+            'voice' => $voiceId,
+            'label' => (string) ($preset['label'] ?? $voiceName),
+            'model' => $usedModel,
+        ]);
     }
 
     /** PCM 16-bit mono -> file WAV (header RIFF) supaya bisa diputar browser. */
