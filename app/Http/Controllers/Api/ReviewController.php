@@ -22,10 +22,14 @@ class ReviewController extends Controller
         $request->validate([
             'provider' => ['nullable', 'string', 'max:60'],
             'model' => ['nullable', 'string', 'max:120'],
+            'from' => ['nullable', 'integer'], // index section awal (BAB terpilih)
+            'to' => ['nullable', 'integer'],   // index section akhir
         ]);
 
         try {
-            $progress = $service->reviewChunk($document, $request->input('provider'), $request->input('model'));
+            $progress = $service->reviewChunk($document, $request->input('provider'), $request->input('model'),
+                $request->input('from') !== null ? (int) $request->input('from') : null,
+                $request->input('to') !== null ? (int) $request->input('to') : null);
         } catch (Throwable $e) {
             report($e);
 

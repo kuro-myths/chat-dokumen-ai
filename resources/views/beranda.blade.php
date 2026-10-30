@@ -143,6 +143,10 @@
                         <span class="badge" id="dp-status">uploaded</span>
                     </div>
                     <div class="doc-actions">
+                        {{-- Pilih bagian yang mau diperiksa: seluruh dokumen atau per BAB --}}
+                        <select id="dp-scope" class="dp-scope" title="Pilih bagian yang mau diperiksa AI">
+                            <option value="all">Seluruh dokumen</option>
+                        </select>
                         <button class="btn small" id="dp-review"><i class="fa-solid fa-wand-magic-sparkles"></i> Periksa AI</button>
                         <a class="btn small ghost" id="dp-export" href="#"><i class="fa-solid fa-download"></i> Unduh</a>
                         <button class="btn small ghost icon" id="dp-close" title="Tutup dokumen"><i class="fa-solid fa-xmark"></i></button>
@@ -326,7 +330,7 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('js/kuro.js') }}?v=20261030-14"></script>
+<script src="{{ asset('js/kuro.js') }}?v=20261030-15"></script>
 @endpush
 
 

@@ -44,12 +44,27 @@ class ThesisReviewService
      *
      * @return array{done:int, total:int, issues:int}
      */
-    public function reviewChunk(Document $document, ?string $provider = null, ?string $model = null): array
+    public function reviewChunk(Document $document, ?string $provider = null, ?string $model = null, ?int $from = null, ?int $to = null): array
     {
         $sections = $document->sections()->orderBy('index')->get()->values();
 
         if ($sections->isEmpty()) {
             throw new \RuntimeException('Dokumen belum diimpor: tidak ada paragraf.');
+        }
+
+        // Review per bagian (BAB): bila rentang from..to dikirim, HANYA section
+        // dalam rentang itu yang dianalisis — temuan pada bab lain tetap aman.
+        $scope = 'all';
+        if ($from !== null || $to !== null) {
+            $f = $from ?? PHP_INT_MIN;
+            $t = $to ?? PHP_INT_MAX;
+            $sections = $sections->filter(fn ($s) => $s->index >= $f && $s->index <= $t)->values();
+
+            if ($sections->isEmpty()) {
+                throw new \RuntimeException('Bagian dokumen yang dipilih tidak ditemukan.');
+            }
+
+            $scope = $sections->first()->index.'-'.$sections->last()->index;
         }
 
         $config = config('ai.review');
@@ -58,11 +73,19 @@ class ThesisReviewService
 
         $summary = $document->review_summary;
 
-        // Mulai sesi baru bila belum ada cursor (dokumen baru / sesi lama macet).
-        if (! is_array($summary) || ! array_key_exists('cursor', $summary)) {
-            $document->highlights()->delete();
-            $document->comments()->where('is_ai', true)->delete();
-            $summary = ['cursor' => 0, 'issues' => 0, 'batches' => 0, 'score' => null, 'overall' => null];
+        // Mulai sesi baru bila belum ada cursor ATAU scope berubah (pengguna
+        // memilih bagian lain di dropdown). Untuk review per BAB, yang dihapus
+        // & diperbarui hanya temuan di dalam rentang itu.
+        if (! is_array($summary) || ! array_key_exists('cursor', $summary) || ($summary['scope'] ?? 'all') !== $scope) {
+            if ($scope === 'all') {
+                $document->highlights()->delete();
+                $document->comments()->where('is_ai', true)->delete();
+            } else {
+                $ids = $sections->pluck('id');
+                $document->highlights()->whereIn('document_section_id', $ids)->delete();
+                $document->comments()->where('is_ai', true)->whereIn('document_section_id', $ids)->delete();
+            }
+            $summary = ['cursor' => 0, 'issues' => 0, 'batches' => 0, 'score' => null, 'overall' => null, 'scope' => $scope];
         }
 
         $cursor = (int) ($summary['cursor'] ?? 0);

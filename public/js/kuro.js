@@ -1883,6 +1883,40 @@
         return html;
     }
 
+    // Dropdown bagian untuk "Periksa AI": daftar BAB (heading level 1) dengan
+    // rentang section-nya. Bila dokumen tanpa BAB, dibagi per 10 paragraf.
+    // Review lalu HANYA memproses bab terpilih — cepat & hemat kuota AI.
+    function renderScopeOptions(sections) {
+        var sel = document.getElementById('dp-scope');
+        if (!sel) return;
+        var keep = sel.value;
+        var opts = ['<option value="all">Seluruh dokumen</option>'];
+        var babs = [];
+        sections.forEach(function (s) {
+            if (s.level === 1 && s.heading) babs.push({ from: s.index, name: s.heading });
+        });
+        if (!babs.length) {
+            var per = 10;
+            for (var i = 0; i * per < sections.length; i++) {
+                var f = i * per, t = Math.min((i + 1) * per - 1, sections.length - 1);
+                opts.push('<option value="' + sections[f].index + '-' + sections[t].index + '">Bagian ' + (i + 1) +
+                    ' (paragraf ' + (f + 1) + '–' + (t + 1) + ')</option>');
+            }
+        } else {
+            var last = sections[sections.length - 1].index;
+            babs.forEach(function (b, i) {
+                var t = (i + 1 < babs.length) ? (babs[i + 1].from - 1) : last;
+                opts.push('<option value="' + b.from + '-' + t + '">' + esc(b.name) + '</option>');
+            });
+        }
+        sel.innerHTML = opts.join('');
+        if (keep) {
+            var ada = false;
+            Array.prototype.forEach.call(sel.options, function (o) { if (o.value === keep) ada = true; });
+            if (ada) sel.value = keep;
+        }
+    }
+
     function renderDocView(doc) {
         document.getElementById('dp-title').textContent = doc.title || ('Dokumen #' + doc.id);
         var badge = document.getElementById('dp-status');
@@ -1900,6 +1934,7 @@
         if (!sections.length) {
             page.innerHTML = '<p class="dv-empty">Dokumen ini belum memiliki konten teks.</p>';
         }
+        renderScopeOptions(sections);
         sections.forEach(function (s) {
             if (s.heading) {
                 var h = document.createElement(s.level === 1 ? 'div' : (s.level === 2 ? 'div' : 'div'));
@@ -2050,13 +2085,19 @@
 
     // ---------- Periksa AI + polling ----------
     document.getElementById('dp-review').addEventListener('click', function () {
-        if (currentDocId) startReview(currentDocId);
+        if (!currentDocId) return;
+        var sel = document.getElementById('dp-scope');
+        var val = sel ? sel.value : 'all';
+        if (val === 'all') { startReview(currentDocId); return; }
+        var parts = val.split('-'); // "indexAwal-indexAkhir"
+        startReview(currentDocId, parseInt(parts[0], 10), parseInt(parts[1], 10));
     });
 
-    function startReview(id) {
+    function startReview(id, from, to) {
         startReadAnimation();
         var st = { done: 0, total: 0, issues: 0 };
-        kuroThinking(true, 'Kuro mulai membaca dokumen… 📖');
+        var scoped = (from != null && to != null);
+        kuroThinking(true, 'Kuro mulai membaca dokumen… 📖' + (scoped ? ' (fokus bagian terpilih)' : ''));
 
         // Review dijalankan PER-BATCH: setiap request memproses sebagian,
         // jadi tidak ada lagi loading diam — progres selalu terlihat dan
@@ -2071,7 +2112,9 @@
                 },
                 body: JSON.stringify({
                     provider: currentProvider,
-                    model: currentModel // model terpilih di dropdown (null = default provider)
+                    model: currentModel, // model terpilih di dropdown (null = default provider)
+                    from: scoped ? from : null, // rentang section (BAB terpilih) — null = seluruh dokumen
+                    to: scoped ? to : null
                 })
             }).then(function (r) { return r.json().then(function (j) { return {ok: r.ok, j: j || {}}; }); }).then(function (res) {
                 loadDocs();
