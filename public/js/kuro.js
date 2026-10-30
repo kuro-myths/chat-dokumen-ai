@@ -1835,38 +1835,56 @@
     });
 
     function startReview(id) {
-        kuroThinking(true, 'Kuro sedang membaca dokumen & menyusun saran… 📖');
-        fetch('/api/documents/' + id + '/review', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': CSRF
-            },
-            body: JSON.stringify({
-                provider: currentProvider,
-                model: currentModel // model terpilih di dropdown (null = default provider)
-            })
-        }).then(function (r) { return r.json().then(function (j) { return {ok: r.ok, j: j}; }); }).then(function (res) {
-            loadDocs();
-            if (!res.ok) {
-                // Ambil penyebab asli — job menyimpan error di review_summary.
-                fetch('/api/documents/' + id + '/review', {headers: {'Accept': 'application/json'}})
-                    .then(function (r2) { return r2.json(); })
-                    .then(function (d) {
-                        kuroThinking(false);
-                        var err = (d && d.summary && d.summary.error) ? d.summary.error : ((res.j && (res.j.message || res.j.error)) || '');
-                        kuroAlert('Review gagal 😿' + (err ? ' — ' + err : ' — pastikan provider AI & API Key sudah diatur di menu API Key, lalu coba lagi.'), 'error');
-                    })
-                    .catch(function () { kuroThinking(false); });
-                return;
-            }
-            kuroThinking(true, 'Kuro sedang membaca dokumen & menyusun saran… 📖');
-            pollReview(id);
-        }).catch(function (e) {
-            kuroThinking(false);
-            kuroAlert((e && e.message) || 'Review gagal dimulai — periksa koneksi lalu coba lagi.', 'error');
-        });
+        var st = { done: 0, total: 0, issues: 0 };
+        kuroThinking(true, 'Kuro mulai membaca dokumen… 📖');
+
+        // Review dijalankan PER-BATCH: setiap request memproses sebagian,
+        // jadi tidak ada lagi loading diam — progres selalu terlihat dan
+        // bila terputus, proses lanjut dari batch terakhir.
+        function step() {
+            fetch('/api/documents/' + id + '/review', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': CSRF
+                },
+                body: JSON.stringify({
+                    provider: currentProvider,
+                    model: currentModel // model terpilih di dropdown (null = default provider)
+                })
+            }).then(function (r) { return r.json().then(function (j) { return {ok: r.ok, j: j || {}}; }); }).then(function (res) {
+                loadDocs();
+                if (!res.ok || res.j.status === 'review_failed') {
+                    var err = res.j.error || (res.j.summary && res.j.summary.error) || res.j.message || '';
+                    kuroThinking(false);
+                    kuroAlert('Review gagal 😿 — ' + (err || 'cek provider AI & API Key di menu API Key, lalu coba lagi.'), 'error');
+                    if (currentDocId === id) openDoc(id);
+                    return;
+                }
+                if (res.j.status === 'reviewed') {
+                    var n = res.j.highlights_count != null ? res.j.highlights_count : ((res.j.progress && res.j.progress.issues) || 0);
+                    var s = res.j.summary || {};
+                    var skor = (s.score != null) ? '\nSkor AI: ' + s.score + '/100' : '';
+                    var overall = s.overall ? '\n\n' + s.overall : '';
+                    kuroThinking(false);
+                    kuroAlert('Review selesai! ✅ ' + n + ' temuan & saran' + skor + (n ? '' : ' — dokumen sudah rapi menurut AI.') + overall, 'success');
+                    if (currentDocId === id) openDoc(id);
+                    return;
+                }
+                // Masih "reviewing" → lanjut batch berikutnya + tampilkan progres.
+                var p = res.j.progress || {};
+                st.done = p.done != null ? p.done : st.done;
+                st.total = p.total != null ? p.total : st.total;
+                st.issues = p.issues != null ? p.issues : st.issues;
+                kuroThinking(true, 'Kuro sedang membaca dokumen & menyusun saran… 📖 (bagian ' + st.done + '/' + st.total + ' · ' + st.issues + ' temuan)');
+                step();
+            }).catch(function (e) {
+                kuroThinking(false);
+                kuroAlert((e && e.message) || 'Review gagal — periksa koneksi lalu coba lagi (progres tersimpan, bisa dilanjutkan).', 'error');
+            });
+        }
+        step();
     }
 
     function pollReview(id) {
