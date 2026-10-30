@@ -25,6 +25,7 @@ Route::get('documents/{document}/highlights', [HighlightController::class, 'inde
 Route::post('documents/{document}/highlights/accept-all', [HighlightController::class, 'acceptAll']);
 Route::post('highlights/{highlight}/accept', [HighlightController::class, 'accept']);
 Route::post('highlights/{highlight}/reject', [HighlightController::class, 'reject']);
+Route::delete('highlights/{highlight}', [HighlightController::class, 'destroy']); // hapus temuan
 
 // ---------- Komentar (mirip Google Docs) ----------
 Route::get('documents/{document}/comments', [CommentController::class, 'index']);

@@ -68,7 +68,33 @@ class HomeController extends Controller
             'history' => ['nullable', 'array', 'max:20'],
             'history.*.role' => ['required_with:history', 'string', 'in:user,assistant'],
             'history.*.content' => ['required_with:history', 'string', 'max:8000'],
+            'document_id' => ['nullable', 'integer'],   // sertakan isi dokumen ini
+            'document_from' => ['nullable', 'integer'],  // opsional: hanya BAB terpilih
+            'document_to' => ['nullable', 'integer'],
         ]);
+
+        // Konteks dokumen: bila document_id dikirim, ISI DOKUMEN (atau hanya
+        // rentang BAB terpilih) ikut disertakan ke AI — chat pun "melihat"
+        // dokumen secara utuh dan bisa menjawab pertanyaan tentang isinya.
+        $context = '';
+        if (! empty($data['document_id'])) {
+            $docCtx = Document::with('sections')->find((int) $data['document_id']);
+            if ($docCtx) {
+                $secs = $docCtx->sections->sortBy('index')->values();
+                if (! empty($data['document_from']) || ! empty($data['document_to'])) {
+                    $f = (int) ($data['document_from'] ?? PHP_INT_MIN);
+                    $t = (int) ($data['document_to'] ?? PHP_INT_MAX);
+                    $secs = $secs->filter(fn ($s) => $s->index >= $f && $s->index <= $t)->values();
+                }
+                $docText = $secs
+                    ->map(fn ($s) => ($s->heading ? '['.$s->heading.'] ' : '').$s->body)
+                    ->implode("\n\n");
+                if (mb_strlen($docText) > 30000) {
+                    $docText = mb_substr($docText, 0, 30000).' …(teks dokumen dipotong karena panjang)';
+                }
+                $context = "\n\n=== ISI DOKUMEN \"".$docCtx->title."\" ===\n".$docText;
+            }
+        }
 
         $history = collect($data['history'] ?? [])
             ->map(fn ($m) => ['role' => $m['role'], 'content' => mb_substr($m['content'], 0, 8000)])
@@ -84,7 +110,14 @@ class HomeController extends Controller
                     .'Jawab ringkas, jelas, dan santai seperti chat dengan teman — pakai bahasa '
                     .'sehari-hari (boleh sapaan kamu dan aku, sedikit emoji), HINDARI bahasa '
                     .'formal akademik atau istilah skripsi kecuali user memintanya. Tetap akurat '
-                    .'dan membantu untuk topik apa pun yang ditanya user.',
+                    .'dan membantu untuk topik apa pun yang ditanya user.'
+                    .($context !== ''
+                        ? ' PENTING: di bawah disertakan ISI DOKUMEN yang sedang dibuka user. '
+                        .'Untuk pertanyaan tentang dokumen itu, jawab BERDASARKAN isinya '
+                        .'(sebut bab/bagian dan halaman bila relevan) — jangan mengaku tidak '
+                        .'bisa membacanya.'
+                        : '')
+                    .$context,
             ]],
             $history,
             [['role' => 'user', 'content' => $data['message']]],

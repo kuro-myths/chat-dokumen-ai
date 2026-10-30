@@ -18,6 +18,7 @@
     var chatCol = document.getElementById('chat-col');
     var chatLog = document.getElementById('chat-log');
     var chatInput = document.getElementById('chat-input');
+    var docLinkOn = true; // saat dokumen terbuka, chat otomatis membawa konteks dokumen
 
     function esc(s) {
         return String(s).replace(/[&<>"']/g, function (c) {
@@ -851,7 +852,9 @@
                 message: text,
                 provider: currentProvider,
                 model: currentModel, // model dari dropdown model (null = default provider)
-                history: history.slice(0, -1).slice(-20)
+                history: history.slice(0, -1).slice(-20),
+                // Dokumen terbuka + chip aktif -> AI membaca isi dokumen ini.
+                document_id: (MODE === 'doc' && currentDocId && docLinkOn) ? currentDocId : null
             })
         }).then(function (r) {
             if (r.status === 419) throw new Error('Sesi sudah berakhir (server baru di-deploy ulang). Muat ulang halaman (tekan F5 / Ctrl+F5), masuk lagi bila diminta, lalu kirim ulang pesanmu.');
@@ -1813,6 +1816,7 @@
         document.getElementById('dp-view').hidden = name !== 'doc';
         document.getElementById('dp-findings').hidden = name !== 'find';
         document.getElementById('dp-comments').hidden = name !== 'comments';
+        document.getElementById('dp-chat').hidden = name !== 'chat';
     }
 
     if (docTabs) {
@@ -1868,6 +1872,72 @@
             box.appendChild(div);
         });
     }
+
+    // ---------- Tanya Dokumen: chat khusus dengan konteks isi dokumen ----------
+    var docChatHist = {}; // riwayat chat per dokumen
+
+    function dcLog() { return document.getElementById('dc-log'); }
+
+    function dcBubble(role, text) {
+        var log = dcLog();
+        if (!log) return;
+        var empty = log.querySelector('.dc-empty');
+        if (empty) empty.parentNode.removeChild(empty);
+        var div = document.createElement('div');
+        div.className = 'dc-msg ' + (role === 'user' ? 'me' : 'ai');
+        div.textContent = text;
+        log.appendChild(div);
+        log.scrollTop = log.scrollHeight;
+    }
+
+    function sendDocChat() {
+        var input = document.getElementById('dc-input');
+        var text = (input ? input.value : '').trim();
+        if (!text || !currentDocId) return;
+        input.value = '';
+        var hist = docChatHist[currentDocId] || (docChatHist[currentDocId] = []);
+        dcBubble('user', text);
+        hist.push({ role: 'user', content: text });
+
+        var sel = document.getElementById('dp-scope');
+        var scope = (sel && sel.value && sel.value !== 'all') ? sel.value.split('-') : null;
+
+        var typing = document.createElement('div');
+        typing.className = 'dc-msg ai typing';
+        typing.textContent = 'Kuro sedang membaca dokumen…';
+        dcLog().appendChild(typing);
+
+        fetch('/chat', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF},
+            body: JSON.stringify({
+                message: text,
+                provider: currentProvider,
+                model: currentModel,
+                document_id: currentDocId, // server menyertakan ISI dokumen sebagai konteks
+                document_from: scope ? parseInt(scope[0], 10) : null,
+                document_to: scope ? parseInt(scope[1], 10) : null,
+                history: hist.slice(0, -1).slice(-20)
+            })
+        }).then(function (r) { return r.json(); }).then(function (data) {
+            if (typing.parentNode) typing.parentNode.removeChild(typing);
+            var reply = (data && data.ok) ? data.content : ('⚠️ ' + ((data && data.error) || 'AI gagal menjawab.'));
+            dcBubble('ai', reply);
+            hist.push({ role: 'assistant', content: reply });
+        }).catch(function (e) {
+            if (typing.parentNode) typing.parentNode.removeChild(typing);
+            dcBubble('ai', '⚠️ ' + e.message);
+        });
+    }
+
+    (function () {
+        var sendBtn = document.getElementById('dc-send');
+        var dcInput = document.getElementById('dc-input');
+        if (sendBtn) sendBtn.addEventListener('click', sendDocChat);
+        if (dcInput) dcInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); sendDocChat(); }
+        });
+    })();
 
     // ---------- Split-screen: buka dokumen ----------
     function markHighlights(bodyHtml, highlights) {
@@ -1950,11 +2020,12 @@
         });
 
         updateTabCounts(doc);
-        renderFindings(doc.highlights || [], doc.id);
+        renderFindings(doc.highlights || [], doc);
         renderComments(doc.comments || [], doc.id);
         renderReviewSummary(doc);
         if ((doc.status || '') === 'reviewing') startReadAnimation(); else stopReadAnimation();
         setMode('doc');
+        updateDocLinkChip();
     }
 
     // Ringkasan hasil AI (skor + kesan umum) tepat di atas daftar temuan.
@@ -1982,7 +2053,10 @@
         box.insertBefore(p, box.firstChild.nextSibling);
     }
 
-    function renderFindings(list, docId) {
+    function renderFindings(list, doc) {
+        var docId = doc.id;
+        var secMap = {};
+        (doc.sections || []).forEach(function (s) { secMap[s.id] = s; });
         var box = document.getElementById('dp-findings');
         box.innerHTML = '<h3><i class="fa-solid fa-magnifying-glass"></i>Temuan AI <span class="chip">' + list.length + '</span></h3>';
         if (!list.length) {
@@ -2014,12 +2088,17 @@
             var div = document.createElement('div');
             div.className = 'hl-item c-' + esc(h.color || 'green') +
                 (h.status === 'accepted' ? ' done' : (h.status === 'rejected' ? ' dropped' : ''));
+            var sec = h.document_section_id ? secMap[h.document_section_id] : null;
+            var locTxt = sec
+                ? (sec.heading ? sec.heading : ('Paragraf ' + ((sec.index || 0) + 1)))
+                : (h.paragraph_index != null ? ('Paragraf ' + (h.paragraph_index + 1)) : '');
             var src = (h.source_model || h.source_provider)
                 ? (h.source_model || 'model?') + (h.source_provider ? ' · ' + h.source_provider : '')
                 : 'AI';
             div.innerHTML =
                 '<div class="hl-top">' +
                 '<span class="hl-dot c-' + esc(h.color || 'green') + '"></span>' +
+                (locTxt ? '<span class="hl-loc" title="Lokasi temuan di dokumen"><i class="fa-solid fa-location-dot"></i> ' + esc(locTxt) + '</span>' : '') +
                 '<span class="hl-type t-' + esc(h.type || 'style') + '">' + esc(typeLabel(h.type)) + '</span>' +
                 (h.severity && h.severity !== 'low' ? '<span class="hl-sev s-' + esc(h.severity) + '">' + esc(h.severity) + '</span>' : '') +
                 (h.status && h.status !== 'pending' ? '<span class="hl-status st-' + esc(h.status) + '">' + esc(h.status) + '</span>' : '') +
@@ -2031,12 +2110,17 @@
                 '<div class="hl-act">' +
                 '<button class="btn small ok-btn"><i class="fa-solid fa-check"></i> Terima</button>' +
                 '<button class="btn small ghost no-btn"><i class="fa-solid fa-xmark"></i> Tolak</button>' +
+                '<button class="btn small ghost icon del-btn" title="Hapus temuan ini"><i class="fa-solid fa-trash-can"></i></button>' +
                 '</div>';
             div.querySelector('.ok-btn').addEventListener('click', function () {
                 actHighlight(h.id, 'accept', docId);
             });
             div.querySelector('.no-btn').addEventListener('click', function () {
                 actHighlight(h.id, 'reject', docId);
+            });
+            var delBtn = div.querySelector('.del-btn');
+            if (delBtn) delBtn.addEventListener('click', function () {
+                delHighlight(h.id, docId);
             });
             box.appendChild(div);
         });
@@ -2048,6 +2132,41 @@
             headers: {'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF}
         }).then(function () { openDoc(docId); });
     }
+
+    // Hapus temuan (komentar AI terkait ikut terhapus otomatis di server).
+    function delHighlight(id, docId) {
+        fetch('/api/highlights/' + id, {
+            method: 'DELETE',
+            headers: {'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF}
+        }).then(function () {
+            kuroToast('Temuan dihapus 🗑️', 'ok');
+            openDoc(docId);
+        });
+    }
+
+    // Chip "Terhubung: <dokumen>" di composer — chat utama otomatis membawa
+    // konteks dokumen yang sedang dibuka; klik chip untuk lepas / sambung lagi.
+    function updateDocLinkChip() {
+        var chip = document.getElementById('doc-link-chip');
+        if (!chip) return;
+        var on = (MODE === 'doc' && currentDocId);
+        chip.hidden = !on;
+        if (on) {
+            var t = document.getElementById('dp-title').textContent || 'dokumen';
+            chip.textContent = docLinkOn ? ('🧩 Terhubung: ' + t) : ('🧩 Konteks dokumen: LEPAS');
+            chip.classList.toggle('off', !docLinkOn);
+        }
+    }
+
+    (function () {
+        var chip = document.getElementById('doc-link-chip');
+        if (!chip) return;
+        chip.addEventListener('click', function () {
+            docLinkOn = !docLinkOn;
+            updateDocLinkChip();
+            kuroToast(docLinkOn ? 'Chat terhubung ke dokumen aktif 🔗' : 'Konteks dokumen dilepas ✂️', 'ok');
+        });
+    })();
 
     // Review otomatis sekali: dokumen baru dibuka & belum pernah diperiksa →
     // Kuro langsung membacanya supaya pengguna tidak perlu menekan apa pun.
@@ -2081,6 +2200,7 @@
     document.getElementById('dp-close').addEventListener('click', function () {
         currentDocId = null;
         setMode(history.length ? 'chat' : 'landing');
+        updateDocLinkChip();
     });
 
     // ---------- Periksa AI + polling ----------

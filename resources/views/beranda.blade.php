@@ -95,6 +95,7 @@
                         <div class="cp-prov-menu cp-model-menu" id="cp-model-menu"></div>
                     </div>
                     <span class="gen-chip" id="gen-chip" hidden></span>
+                        <span class="gen-chip" id="doc-link-chip" hidden title="Klik untuk lepas / sambungkan konteks dokumen ke chat"></span>
                     <span class="cp-status" id="chat-status"></span>
                     <button class="cp-btn" id="btn-save-chat" title="Simpan percakapan"><i class="fa-solid fa-floppy-disk"></i></button>
                     <button class="cp-btn" id="btn-mic" title="Dikte suara (bahasa Indonesia)"><i class="fa-solid fa-microphone"></i></button>
@@ -157,11 +158,20 @@
                     <button type="button" class="doc-tab active" data-tab="doc"><i class="fa-solid fa-file-lines"></i> Dokumen</button>
                     <button type="button" class="doc-tab" data-tab="find"><i class="fa-solid fa-magnifying-glass"></i> Temuan AI <span class="tab-chip" id="tab-find-count">0</span></button>
                     <button type="button" class="doc-tab" data-tab="comments"><i class="fa-solid fa-comments"></i> Komentar <span class="tab-chip" id="tab-cm-count">0</span></button>
+                    <button type="button" class="doc-tab" data-tab="chat"><i class="fa-solid fa-cat"></i> Tanya Dokumen</button>
                 </div>
                 <div class="doc-body">
                     <div class="doc-view" id="dp-view"></div>
                     <div class="doc-find" id="dp-findings" hidden></div>
                     <div class="doc-comments" id="dp-comments" hidden></div>
+                    {{-- Chat khusus dokumen: pertanyaan otomatis membawa ISI dokumen sebagai konteks AI --}}
+                    <div class="doc-chat" id="dp-chat" hidden>
+                        <div class="dc-log" id="dc-log"><p class="dc-empty">Tanya apa saja tentang dokumen ini — Kuro sudah membaca isinya secara utuh. Contoh: &quot;Ringkas bab metodologi&quot; atau &quot;Bagian mana yang paling lemah?&quot;</p></div>
+                        <div class="dc-input">
+                            <input id="dc-input" type="text" placeholder="Tanya tentang dokumen ini…" autocomplete="off">
+                            <button type="button" class="btn small" id="dc-send"><i class="fa-solid fa-paper-plane"></i></button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -330,7 +340,7 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('js/kuro.js') }}?v=20261030-15"></script>
+<script src="{{ asset('js/kuro.js') }}?v=20261030-16"></script>
 @endpush
 
 

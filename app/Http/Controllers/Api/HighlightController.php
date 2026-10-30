@@ -34,6 +34,14 @@ class HighlightController extends Controller
         ]);
     }
 
+    /** Hapus temuan (komentar AI terkait ikut terhapus via FK cascade). */
+    public function destroy(Highlight $highlight): JsonResponse
+    {
+        $highlight->delete();
+
+        return response()->json(['message' => 'Temuan dihapus.']);
+    }
+
     public function acceptAll(Document $document, RevisionService $revisions): JsonResponse
     {
         $count = $revisions->acceptAll($document);
