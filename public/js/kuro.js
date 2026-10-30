@@ -1765,6 +1765,79 @@
             });
     }
 
+    // ---------- Tab panel dokumen: Dokumen / Temuan AI / Komentar ----------
+    // Temuan & komentar TIDAK lagi menumpuk di bawah dokumen (dulu memakan
+    // 42% tinggi panel & menyulitkan scroll) — kini masing-masing punya tab
+    // sendiri dengan scroll penuh, dokumen tetap utuh 100%.
+    var docTabs = document.getElementById('dp-tabs');
+
+    var TYPE_LABEL = { grammar: 'Tata Bahasa', citation: 'Kutipan', methodology: 'Metodologi', structure: 'Struktur', style: 'Gaya Penulisan' };
+    function typeLabel(t) { return TYPE_LABEL[t] || 'Lainnya'; }
+
+    function showDocTab(name) {
+        if (!docTabs) return;
+        Array.prototype.forEach.call(docTabs.querySelectorAll('.doc-tab'), function (b) {
+            b.classList.toggle('active', b.dataset.tab === name);
+        });
+        document.getElementById('dp-view').hidden = name !== 'doc';
+        document.getElementById('dp-findings').hidden = name !== 'find';
+        document.getElementById('dp-comments').hidden = name !== 'comments';
+    }
+
+    if (docTabs) {
+        docTabs.addEventListener('click', function (e) {
+            var b = e.target.closest ? e.target.closest('.doc-tab') : null;
+            if (b) showDocTab(b.dataset.tab);
+        });
+    }
+
+    function updateTabCounts(doc) {
+        var fc = document.getElementById('tab-find-count');
+        var cc = document.getElementById('tab-cm-count');
+        if (fc) fc.textContent = (doc.highlights || []).length;
+        if (cc) cc.textContent = (doc.comments || []).length;
+    }
+
+    // Komentar dokumen: temuan AI otomatis jadi komentar (badge AI + model)
+    // plus komentar manual mahasiswa/dosen — bisa ditandai selesai.
+    function renderComments(list, docId) {
+        var box = document.getElementById('dp-comments');
+        if (!box) return;
+        box.innerHTML = '<h3><i class="fa-solid fa-comments"></i>Komentar <span class="chip">' + list.length + '</span></h3>';
+        if (!list.length) {
+            box.innerHTML += '<p class="muted" style="font-size:.8rem">Belum ada komentar — temuan AI juga akan muncul di sini.</p>';
+            return;
+        }
+        list.forEach(function (c) {
+            var div = document.createElement('div');
+            div.className = 'cm-item' + (c.is_ai ? ' ai' : '') + (c.resolved ? ' resolved' : '');
+            div.innerHTML =
+                '<div class="cm-head">' +
+                '<b>' + esc(c.author_name || 'Anonim') + '</b>' +
+                (c.is_ai ? '<span class="cm-badge"><i class="fa-solid fa-robot"></i> AI</span>' : '') +
+                (c.resolved ? '<span class="cm-res">Selesai</span>' : '') +
+                '</div>' +
+                '<div class="cm-body">' + esc(c.body) + '</div>';
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn small ghost';
+            btn.innerHTML = c.resolved
+                ? '<i class="fa-solid fa-rotate-left"></i> Buka lagi'
+                : '<i class="fa-solid fa-check"></i> Tandai selesai';
+            btn.addEventListener('click', function () {
+                fetch('/api/comments/' + c.id + '/resolve', {
+                    method: 'PATCH',
+                    headers: {'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF}
+                }).then(function () { openDoc(docId); });
+            });
+            var act = document.createElement('div');
+            act.className = 'cm-act';
+            act.appendChild(btn);
+            div.appendChild(act);
+            box.appendChild(div);
+        });
+    }
+
     // ---------- Split-screen: buka dokumen ----------
     function markHighlights(bodyHtml, highlights) {
         var html = bodyHtml;
@@ -1806,7 +1879,9 @@
             }
         });
 
+        updateTabCounts(doc);
         renderFindings(doc.highlights || [], doc.id);
+        renderComments(doc.comments || [], doc.id);
         renderReviewSummary(doc);
         setMode('doc');
     }
@@ -1866,12 +1941,22 @@
 
         list.slice(0, 40).forEach(function (h) {
             var div = document.createElement('div');
-            div.className = 'hl-item c-' + esc(h.color || 'green');
+            div.className = 'hl-item c-' + esc(h.color || 'green') +
+                (h.status === 'accepted' ? ' done' : (h.status === 'rejected' ? ' dropped' : ''));
+            var src = (h.source_model || h.source_provider)
+                ? (h.source_model || 'model?') + (h.source_provider ? ' · ' + h.source_provider : '')
+                : 'AI';
             div.innerHTML =
+                '<div class="hl-top">' +
+                '<span class="hl-dot c-' + esc(h.color || 'green') + '"></span>' +
+                '<span class="hl-type t-' + esc(h.type || 'style') + '">' + esc(typeLabel(h.type)) + '</span>' +
+                (h.severity && h.severity !== 'low' ? '<span class="hl-sev s-' + esc(h.severity) + '">' + esc(h.severity) + '</span>' : '') +
+                (h.status && h.status !== 'pending' ? '<span class="hl-status st-' + esc(h.status) + '">' + esc(h.status) + '</span>' : '') +
+                '<span class="hl-src" title="Model AI yang memberikan saran ini"><i class="fa-solid fa-robot"></i> ' + esc(src) + '</span>' +
+                '</div>' +
                 '<div class="q">' + esc(h.quote) + '</div>' +
                 (h.comment ? '<div class="c">💬 ' + esc(h.comment) + '</div>' : '') +
                 (h.suggestion ? '<div class="c">✍️ ' + esc(h.suggestion) + '</div>' : '') +
-                (h.status && h.status !== 'pending' ? '<div class="c">Status: ' + esc(h.status) + '</div>' : '') +
                 '<div class="hl-act">' +
                 '<button class="btn small ok-btn"><i class="fa-solid fa-check"></i> Terima</button>' +
                 '<button class="btn small ghost no-btn"><i class="fa-solid fa-xmark"></i> Tolak</button>' +
@@ -1962,6 +2047,7 @@
                 }
                 if (res.j.status === 'reviewed') {
                     var n = res.j.highlights_count != null ? res.j.highlights_count : ((res.j.progress && res.j.progress.issues) || 0);
+                    showDocTab('find');
                     var s = res.j.summary || {};
                     var skor = (s.score != null) ? '\nSkor AI: ' + s.score + '/100' : '';
                     var overall = s.overall ? '\n\n' + s.overall : '';

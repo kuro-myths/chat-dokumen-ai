@@ -15,6 +15,7 @@ class Highlight extends Model
     protected $fillable = [
         'document_id', 'document_section_id', 'paragraph_index', 'quote',
         'type', 'severity', 'color', 'comment', 'suggestion', 'replacement', 'status',
+        'source_provider', 'source_model',
     ];
 
     public function document(): BelongsTo

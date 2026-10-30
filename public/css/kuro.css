@@ -190,7 +190,55 @@ a{color:var(--accent);text-decoration:none}
 .hl-mark.c-red{background:#fdeceb}.hl-mark.c-yellow{background:#fef3d0}
 .hl-mark.c-blue{background:#e8f0fe}.hl-mark.c-purple{background:#f3e8fd}
 .hl-mark.c-green{background:#e6f4ea}
-.doc-find{max-height:42%;overflow-y:auto;border-top:1px solid var(--line);padding:14px 18px;background:var(--soft)}
+/* ===== Tab panel dokumen: Dokumen / Temuan AI / Komentar ===== */
+.doc-tabs{display:flex;gap:6px;padding:8px 16px;border-bottom:1px solid var(--line);background:var(--soft);overflow-x:auto}
+.doc-tab{display:inline-flex;align-items:center;gap:8px;border:none;background:transparent;font:inherit;
+  font-size:.8rem;font-weight:700;color:var(--muted);padding:7px 14px;border-radius:999px;cursor:pointer;
+  white-space:nowrap;transition:background .12s,color .12s}
+.doc-tab:hover{background:rgba(255,255,255,.8);color:var(--text)}
+.doc-tab.active{background:var(--accent-soft);color:var(--accent)}
+.tab-chip{background:#fff;border:1px solid var(--line);border-radius:999px;padding:1px 8px;
+  font-size:.66rem;font-weight:700;color:#4b4570}
+.doc-body{flex:1;min-height:0;position:relative;background:var(--soft)}
+.doc-body .doc-view{position:absolute;inset:0}
+.doc-find{position:absolute;inset:0;overflow-y:auto;padding:14px 18px;background:var(--soft)}
+.doc-comments{position:absolute;inset:0;overflow-y:auto;padding:14px 18px;background:var(--soft)}
+.doc-body [hidden]{display:none !important}
+
+/* Kartu temuan AI v2: header chip + badge model AI */
+.hl-item{background:#fff;border:1px solid var(--line);border-left-width:4px;border-radius:12px;
+  padding:11px 14px;margin-top:10px;font-size:.82rem;box-shadow:0 1px 4px rgba(60,40,120,.06);
+  animation:kuro-pop .2s ease both}
+.hl-item.done,.hl-item.dropped{opacity:.55}
+.hl-top{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.hl-dot{width:9px;height:9px;border-radius:50%;flex:none}
+.hl-type{font-size:.64rem;font-weight:800;letter-spacing:.4px;text-transform:uppercase;border-radius:99px;padding:2px 9px}
+.hl-type.t-grammar{background:var(--err-bg);color:var(--err)}
+.hl-type.t-citation{background:var(--warn-bg);color:var(--warn)}
+.hl-type.t-methodology{background:#e8f0fe;color:#1a73e8}
+.hl-type.t-structure{background:#f3e8fd;color:#9334e6}
+.hl-type.t-style{background:var(--ok-bg);color:var(--ok)}
+.hl-sev{font-size:.62rem;font-weight:800;text-transform:uppercase;border-radius:99px;padding:2px 8px}
+.hl-sev.s-high{background:var(--err-bg);color:var(--err)}
+.hl-sev.s-medium{background:var(--warn-bg);color:var(--warn)}
+.hl-status{font-size:.62rem;font-weight:800;text-transform:uppercase;border-radius:99px;padding:2px 8px}
+.hl-status.st-accepted{background:var(--ok-bg);color:var(--ok)}
+.hl-status.st-rejected{background:#eef0f4;color:#5f6368}
+.hl-src{margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:.66rem;font-weight:700;
+  color:var(--accent);background:var(--accent-soft);border:1px solid #d9cff0;border-radius:99px;padding:2px 9px}
+
+/* Kartu komentar (temuan AI + komentar manual) */
+.cm-item{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 14px;
+  margin-top:10px;font-size:.82rem}
+.cm-item.ai{border-left:4px solid var(--accent)}
+.cm-item.resolved{opacity:.6}
+.cm-head{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.cm-head b{font-size:.78rem}
+.cm-badge{display:inline-flex;align-items:center;gap:4px;font-size:.62rem;font-weight:800;
+  color:var(--accent);background:var(--accent-soft);border-radius:99px;padding:1px 8px}
+.cm-res{margin-left:auto;font-size:.62rem;font-weight:800;color:var(--ok)}
+.cm-body{color:#33304a;line-height:1.5}
+.cm-act{margin-top:6px}
 .doc-find h3{margin:0 0 4px;font-size:.95rem}
 .hl-item{background:#fff;border:1px solid var(--line);border-left-width:4px;border-radius:11px;
   padding:10px 14px;margin-top:8px;font-size:.82rem}

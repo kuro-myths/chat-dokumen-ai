@@ -92,7 +92,7 @@ class ThesisReviewService
             $issues = array_slice($data['issues'] ?? [], 0, $config['max_issues_per_batch']);
 
             foreach ($issues as $issue) {
-                $this->persistIssue($document, $batch->values(), $issue);
+                $this->persistIssue($document, $batch->values(), $issue, $response);
                 $summary['issues'] = ($summary['issues'] ?? 0) + 1;
             }
 
@@ -120,7 +120,7 @@ class ThesisReviewService
     }
 
     /** @param Collection $batch */
-    protected function persistIssue(Document $document, $batch, array $issue): void
+    protected function persistIssue(Document $document, $batch, array $issue, \App\Services\Ai\AiResponse $response): void
     {
         $index = (int) ($issue['paragraph'] ?? $issue['index'] ?? -1);
         $section = $batch->firstWhere('index', $index);
@@ -147,6 +147,8 @@ class ThesisReviewService
             'suggestion' => $issue['suggestion'] ?? '',
             'replacement' => ($issue['replacement'] ?? null) ?: null,
             'status' => 'pending',
+            'source_provider' => $response->provider ?: null,
+            'source_model' => $response->model ?: null,
         ]);
 
         // Setiap temuan otomatis menjadi komentar AI di dokumen.
@@ -154,7 +156,7 @@ class ThesisReviewService
             'document_id' => $document->id,
             'document_section_id' => $section?->id,
             'highlight_id' => $highlight->id,
-            'author_name' => 'AI Reviewer',
+            'author_name' => 'AI Reviewer'.($response->model ? ' · '.$response->model : ''),
             'is_ai' => true,
             'body' => $issue['comment'] ?? '',
         ]);

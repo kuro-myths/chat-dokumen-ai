@@ -148,8 +148,17 @@
                         <button class="btn small ghost icon" id="dp-close" title="Tutup dokumen"><i class="fa-solid fa-xmark"></i></button>
                     </div>
                 </div>
-                <div class="doc-view" id="dp-view"></div>
-                <div class="doc-find" id="dp-findings"></div>
+                {{-- Tab: dokumen / temuan AI / komentar — temuan TIDAK lagi menutupi dokumen --}}
+                <div class="doc-tabs" id="dp-tabs">
+                    <button type="button" class="doc-tab active" data-tab="doc"><i class="fa-solid fa-file-lines"></i> Dokumen</button>
+                    <button type="button" class="doc-tab" data-tab="find"><i class="fa-solid fa-magnifying-glass"></i> Temuan AI <span class="tab-chip" id="tab-find-count">0</span></button>
+                    <button type="button" class="doc-tab" data-tab="comments"><i class="fa-solid fa-comments"></i> Komentar <span class="tab-chip" id="tab-cm-count">0</span></button>
+                </div>
+                <div class="doc-body">
+                    <div class="doc-view" id="dp-view"></div>
+                    <div class="doc-find" id="dp-findings" hidden></div>
+                    <div class="doc-comments" id="dp-comments" hidden></div>
+                </div>
             </div>
         </div>
     </main>
@@ -317,7 +326,7 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('js/kuro.js') }}?v=20261030-12"></script>
+<script src="{{ asset('js/kuro.js') }}?v=20261030-13"></script>
 @endpush
 
 
