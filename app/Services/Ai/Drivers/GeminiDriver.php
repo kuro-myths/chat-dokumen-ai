@@ -77,19 +77,27 @@ class GeminiDriver implements AiProviderInterface
     public function chat(array $messages, array $options = []): AiResponse
     {
         foreach ($this->modelCandidates($options) as $model) {
-            $response = $this->postChat($messages, $options, $model);
+            try {
+                $response = $this->postChat($messages, $options, $model);
+            } catch (\Throwable) {
+                continue; // gangguan koneksi -> coba model berikutnya
+            }
 
-            // Model pensiun / tidak tersedia -> LANGSUNG coba model berikutnya.
-            if ($this->modelUnavailable($response)) {
+            // Model pensiun / sibuk (503) / kuota (429) -> LANGSUNG coba model berikutnya.
+            if ($this->shouldSwitchModel($response)) {
                 continue;
             }
 
             // Model tertentu (mis. keluarga Gemma) tidak mendukung systemInstruction
             // -> ulangi sekali dengan system digabung ke pesan user pertama.
             if ($response->status() === 400 && $this->systemNotSupported((string) $response->body())) {
-                $response = $this->postChat($messages, $options + ['merge_system' => true], $model);
+                try {
+                    $response = $this->postChat($messages, $options + ['merge_system' => true], $model);
+                } catch (\Throwable) {
+                    continue;
+                }
 
-                if ($this->modelUnavailable($response)) {
+                if ($this->shouldSwitchModel($response)) {
                     continue;
                 }
             }
@@ -188,15 +196,15 @@ class GeminiDriver implements AiProviderInterface
             // Paksa header diterima supaya status HTTP bisa dicek sebelum streaming.
             try {
                 $response->getHeaders();
-            } catch (\Throwable $e) {
-                throw new RuntimeException('Gagal menghubungi Gemini: '.$e->getMessage());
+            } catch (\Throwable) {
+                continue; // gangguan koneksi -> coba model berikutnya
             }
 
             $code = (int) ($response->getInfo('http_code') ?? 200);
             $body = $code >= 400 ? $response->getContent(false) : '';
 
-            // Model pensiun / tidak tersedia -> coba model berikutnya.
-            if ($code === 404 || ($code === 400 && $this->bodyModelUnavailable($body))) {
+            // Model pensiun / sibuk (503) / kuota (429) -> coba model berikutnya.
+            if ($this->codeShouldSwitch($code, $body)) {
                 continue;
             }
 
@@ -322,13 +330,22 @@ class GeminiDriver implements AiProviderInterface
         );
     }
 
-    /** True bila response gagal karena model pensiun -> layak coba model berikutnya. */
-    protected function modelUnavailable(Response $response): bool
+    /**
+     * True bila response layak DILEWATI ke model berikutnya: model pensiun /
+     * tidak ada (404/400), server sibuk / 503 dst., atau kuota habis (429).
+     */
+    protected function shouldSwitchModel(Response $response): bool
     {
-        if ($response->status() === 404) {
+        return $this->codeShouldSwitch($response->status(), (string) $response->body());
+    }
+
+    /** Varian streaming dari shouldSwitchModel (kode HTTP + body mentah). */
+    protected function codeShouldSwitch(int $code, string $body): bool
+    {
+        if ($code === 404 || $code === 429 || $code >= 500) {
             return true;
         }
 
-        return $response->status() === 400 && $this->bodyModelUnavailable((string) $response->body());
+        return $code === 400 && $this->bodyModelUnavailable($body);
     }
 }

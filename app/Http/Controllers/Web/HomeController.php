@@ -91,8 +91,6 @@ class HomeController extends Controller
         );
 
         try {
-            $provider = Ai::provider($data['provider'] ?? null);
-
             // Model bisa dipilih per pesan lewat dropdown model di composer.
             // Null / kosong -> pakai model default provider (config / ai_settings).
             $options = ['timeout' => 60];
@@ -100,7 +98,9 @@ class HomeController extends Controller
                 $options['model'] = $data['model'];
             }
 
-            $response = $provider->chat($messages, $options);
+            // chatAuto: bila provider/model pilihan gagal (503, pensiun, kuota,
+            // dsb.) otomatis dicoba model & provider lain sampai ada yang hidup.
+            $response = Ai::chatAuto($messages, $options, $data['provider'] ?? null);
 
             return response()->json([
                 'ok' => true,

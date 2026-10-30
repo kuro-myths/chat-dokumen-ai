@@ -3,6 +3,7 @@
 namespace App\Services\Ai;
 
 use App\Models\AiSetting;
+use App\Services\Ai\AiResponse;
 use App\Services\Ai\Contracts\AiProviderInterface;
 use App\Services\Ai\Drivers\GeminiDriver;
 use App\Services\Ai\Drivers\OpenAiCompatibleDriver;
@@ -68,6 +69,58 @@ class AiManager
     public function setDefault(string $name): void
     {
         $this->config['default'] = $name;
+    }
+
+    /**
+     * Chat dengan FALLBACK MENYELURUH (lintas model + lintas provider):
+     * coba provider yang diminta dulu (di dalamnya driver sudah otomatis
+     * berganti model saat kena error 503/404/429/5xx), lalu bila masih
+     * gagal otomatis pindah ke provider lain yang aktif — sampai ada
+     * yang berhasil menjawab. Semua error ditampung untuk pesan akhir.
+     */
+    public function chatAuto(array $messages, array $options = [], ?string $provider = null): AiResponse
+    {
+        $errors = [];
+
+        foreach ($this->providerOrder($provider) as $name) {
+            try {
+                return $this->provider($name)->chat($messages, $options);
+            } catch (\Throwable $e) {
+                $errors[] = '['.$name.'] '.mb_substr($e->getMessage(), 0, 160);
+            }
+        }
+
+        throw new \RuntimeException(
+            'Semua AI gagal menjawab — sudah otomatis dicoba semua model & provider aktif. Detail: '
+            .implode(' | ', $errors ?: ['tidak ada provider aktif'])
+        );
+    }
+
+    /** Urutan provider yang dicoba: yang diminta -> default -> semua yang aktif. */
+    protected function providerOrder(?string $requested): array
+    {
+        $order = [];
+
+        if ($requested !== null && $requested !== '') {
+            $order[] = $requested;
+        }
+
+        $order[] = $this->defaultName();
+
+        try {
+            AiSetting::query()
+                ->where('is_active', true)
+                ->pluck('slug')
+                ->each(fn ($slug) => $order[] = $slug);
+        } catch (\Throwable) {
+            // tabel belum dimigrasi — lanjut ke config
+        }
+
+        foreach (array_keys($this->config['providers'] ?? []) as $slug) {
+            $order[] = $slug;
+        }
+
+        return array_values(array_unique(array_filter($order)));
     }
 
     protected function build(string $name, array $config): AiProviderInterface

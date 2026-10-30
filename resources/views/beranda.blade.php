@@ -89,7 +89,7 @@
                     <div class="cp-model">
                         <button class="cp-prov-btn" id="cp-model-btn" title="Pilih model AI">
                             <i class="fa-solid fa-microchip"></i>
-                            <span id="cp-model-name">Model otomatis</span>
+                            <span id="cp-model-name">Otomatis (semua AI)</span>
                             <i class="fa-solid fa-chevron-down"></i>
                         </button>
                         <div class="cp-prov-menu cp-model-menu" id="cp-model-menu"></div>
@@ -317,7 +317,7 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('js/kuro.js') }}?v=20261030-11"></script>
+<script src="{{ asset('js/kuro.js') }}?v=20261030-12"></script>
 @endpush
 
 

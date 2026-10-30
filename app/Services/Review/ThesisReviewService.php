@@ -66,12 +66,13 @@ class ThesisReviewService
         }
 
         $cursor = (int) ($summary['cursor'] ?? 0);
-        $ai = Ai::provider($provider);
 
         if ($cursor < $total) {
             $batch = $chunks[$cursor];
 
-            $response = $ai->chat(
+            // chatAuto: bila model/provider pilihan error (503, pensiun, kuota,
+            // dsb.) otomatis dicoba model & provider lain sampai ada yang hidup.
+            $response = Ai::chatAuto(
                 [
                     ['role' => 'system', 'content' => ThesisReviewPrompts::system($document->type)],
                     ['role' => 'user', 'content' => ThesisReviewPrompts::userPrompt($batch->values(), $document->type)],
@@ -82,6 +83,7 @@ class ThesisReviewService
                     'temperature' => $config['temperature'],
                     'timeout' => $config['timeout'],
                 ],
+                $provider,
             );
 
             $data = $response->json();
