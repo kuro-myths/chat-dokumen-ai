@@ -698,6 +698,7 @@
             var div = document.createElement('div');
             div.className = 'msg ' + (m.role === 'user' ? 'user' : 'ai');
             if (m.type === 'image' && m.image) {
+
                 if (m.content) {
                     var cap = document.createElement('div');
                     cap.className = 'msg-cap';
@@ -1327,9 +1328,37 @@
             .then(function (r) { return r.json(); })
             .then(function (docs) {
                 document.getElementById('cnt-docs').textContent = docs.length;
+                // Sinkronkan kartu statistik di landing dengan data terbaru.
+                var sd = document.getElementById('stat-documents');
+                if (sd) sd.textContent = docs.length;
+                var hl = 0;
+                docs.forEach(function (d) { hl += d.highlights_count || 0; });
+                var sh = document.getElementById('stat-highlights');
+                if (sh) sh.textContent = hl;
                 if (cb) cb(docs);
             })
             .catch(function () { if (cb) cb([]); });
+    }
+
+    // Impor ulang dokumen yang macet (status "uploaded", 0 paragraf)
+    // tanpa perlu mengunggah file lagi.
+    function reimportDoc(id, btn) {
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-rotate"></i>'; }
+        fetch('/api/documents/' + id + '/reimport', {method: 'POST', headers: {'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF}})
+            .then(function (r) { return r.json().then(function (j) { return {ok: r.ok, j: j}; }); })
+            .then(function (res) {
+                if (res.ok) {
+                    var n = res.j && res.j.document && res.j.document.sections ? res.j.document.sections.length : 0;
+                    kuroToast('Impor ulang berhasil (' + n + ' paragraf) ✅', 'ok');
+                    loadDocs(renderDocList);
+                } else {
+                    kuroAlert((res.j && (res.j.message || res.j.error)) || 'Impor ulang gagal.', 'error');
+                }
+            })
+            .catch(function (e) {
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-rotate"></i>'; }
+                kuroAlert(e.message || 'Impor ulang gagal.', 'error');
+            });
     }
 
     function openDocModal() {
@@ -1370,12 +1399,16 @@
                     '<span class="doc-card-ic"><i class="fa-solid fa-file-lines"></i></span>' +
                     '<div class="grow"><b>' + esc(d.title) + '</b>' +
                     '<small>' + esc(d.type || 'skripsi') + ' · ' + esc(date) + '</small></div>' +
+
                     '<span class="badge ' + esc(st) + '">' + esc(st) + '</span>' +
                 '</div>' +
                 '<div class="doc-card-stats">' + stats.join('') + '</div>' +
                 '<div class="doc-card-act">' +
                     '<button type="button" class="btn small open-btn"><i class="fa-solid fa-arrow-right"></i> Buka</button>' +
                     '<span class="grow"></span>' +
+                    ((d.sections_count || 0) === 0
+                        ? '<button type="button" class="btn small ghost retry-btn" title="Impor ulang isi dokumen (tanpa unggah lagi)"><i class="fa-solid fa-rotate"></i></button>'
+                        : '') +
                     '<button type="button" class="btn small ghost review-btn" title="Periksa AI (review highlight + komentar)"><i class="fa-solid fa-wand-magic-sparkles"></i></button>' +
                     '<a class="btn small ghost dl-btn" title="Unduh .docx hasil"><i class="fa-solid fa-download"></i></a>' +
                     '<button type="button" class="btn small ghost del-btn" title="Hapus"><i class="fa-solid fa-trash-can"></i></button>' +
@@ -1391,6 +1424,13 @@
                 openDoc(d.id);
                 startReview(d.id);
             });
+            var retryBtn = card.querySelector('.retry-btn');
+            if (retryBtn) {
+                retryBtn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    reimportDoc(d.id, retryBtn);
+                });
+            }
             card.querySelector('.dl-btn').href = '/api/documents/' + d.id + '/export';
             card.querySelector('.dl-btn').addEventListener('click', function (e) { e.stopPropagation(); });
             card.querySelector('.del-btn').addEventListener('click', function (e) {
@@ -1592,6 +1632,10 @@
                         m = 'File terlalu besar untuk server (melebihi batas unggah PHP). Kecilkan dokumen (kompres gambar) lalu coba lagi.';
                     } else if (r.status === 422 && /document.*required|No file/i.test(m)) {
                         m = 'File tidak sampai ke server — kemungkinan melebihi batas unggah. Coba file .docx yang lebih kecil.';
+                    }
+                    // Sertakan penyebab asli dari server supaya error tidak lagi generik.
+                    if (j && j.error && String(j.error).indexOf(m) === -1) {
+                        m += ' — Detail: ' + j.error;
                     }
                     throw new Error(m);
                 });
@@ -2056,6 +2100,7 @@
             if (!availableModels.length) return;
             openModelDrop(true);
             renderModelDrop();
+
         });
     }
     // Klik di luar area pencarian model → tutup dropdown
@@ -2114,6 +2159,7 @@
     fetchConvs();
     restoreCurrent();
 })();
+
 
 
 
