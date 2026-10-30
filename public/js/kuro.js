@@ -121,8 +121,29 @@
         if (e.key === 'Escape') { closeKuroAlert(); closeKuroPrompt(); }
     });
 
-    // ---------- Maskot Kuro (dihapus dari UI — no-op agar sisa kode tetap aman) ----------
-    function kuroThinking() {}
+    // ---------- Maskot Kuro: animasi "sedang membaca / memeriksa" ----------
+    var kthinkEl = null;
+
+    function kuroThinking(show, msg) {
+        if (show) {
+            if (!kthinkEl) {
+                kthinkEl = document.createElement('div');
+                kthinkEl.className = 'kuro-read';
+                kthinkEl.innerHTML =
+                    '<div class="kuro-read-panel">' +
+                    '<div class="kuro-read-cat"><span class="kr-cat">🐱</span><span class="kr-book">📖</span><span class="kr-scan"></span></div>' +
+                    '<p class="kuro-read-msg"></p>' +
+                    '<div class="kuro-read-dots"><i></i><i></i><i></i></div>' +
+                    '</div>';
+                document.body.appendChild(kthinkEl);
+            }
+            kthinkEl.querySelector('.kuro-read-msg').textContent = msg || 'Kuro sedang berpikir…';
+            kthinkEl.classList.add('open');
+        } else {
+            if (kthinkEl) kthinkEl.classList.remove('open');
+            if (msg) kuroToast(msg, /gagal|😿/.test(msg) ? 'err' : 'ok');
+        }
+    }
 
     // ---------- Sidebar buka/tutup ----------
     var sbClosed = false;
@@ -1698,7 +1719,23 @@
         });
 
         renderFindings(doc.highlights || [], doc.id);
+        renderReviewSummary(doc);
         setMode('doc');
+    }
+
+    // Ringkasan hasil AI (skor + kesan umum) tepat di atas daftar temuan.
+    function renderReviewSummary(doc) {
+        var box = document.getElementById('dp-findings');
+        if (!box) return;
+        var s = doc.review_summary || {};
+        var hasScore = s.score != null;
+        if (!hasScore && !s.overall && !s.error) return;
+        var p = document.createElement('p');
+        p.className = 'dv-summary' + (s.error ? ' dv-summary-err' : '');
+        p.textContent = s.error
+            ? 'Review gagal: ' + s.error
+            : (hasScore ? 'Skor AI: ' + s.score + '/100. ' : '') + (s.overall || '');
+        box.insertBefore(p, box.firstChild.nextSibling);
     }
 
     function renderFindings(list, docId) {
@@ -1758,6 +1795,22 @@
         }).then(function () { openDoc(docId); });
     }
 
+    // Review otomatis sekali: dokumen baru dibuka & belum pernah diperiksa →
+    // Kuro langsung membacanya supaya pengguna tidak perlu menekan apa pun.
+    var autoReviewed = {};
+
+    function maybeAutoReview(doc) {
+        if (!doc || !doc.id) return;
+        if (doc.status !== 'imported' && doc.status !== 'uploaded') return;
+        if (autoReviewed[doc.id]) return;
+        var hasSections = doc.sections && doc.sections.length;
+        var hasFindings = doc.highlights && doc.highlights.length;
+        if (hasSections && !hasFindings) {
+            autoReviewed[doc.id] = true;
+            startReview(doc.id);
+        }
+    }
+
     function openDoc(id) {
         currentDocId = id;
         kuroThinking(true, 'Kuro membuka dokumen… 📄');
@@ -1766,6 +1819,7 @@
             .then(function (doc) {
                 renderDocView(doc);
                 kuroThinking(false);
+                maybeAutoReview(doc);
             })
             .catch(function (e) { kuroThinking(false); kuroAlert(e.message); });
     }
@@ -1781,7 +1835,7 @@
     });
 
     function startReview(id) {
-        kuroThinking(true, 'Kuro sedang membaca dokumen… 📄');
+        kuroThinking(true, 'Kuro sedang membaca dokumen & menyusun saran… 📖');
         fetch('/api/documents/' + id + '/review', {
             method: 'POST',
             headers: {
@@ -1793,10 +1847,26 @@
                 provider: currentProvider,
                 model: currentModel // model terpilih di dropdown (null = default provider)
             })
-        }).then(function (r) { return r.json(); }).then(function () {
+        }).then(function (r) { return r.json().then(function (j) { return {ok: r.ok, j: j}; }); }).then(function (res) {
             loadDocs();
+            if (!res.ok) {
+                // Ambil penyebab asli — job menyimpan error di review_summary.
+                fetch('/api/documents/' + id + '/review', {headers: {'Accept': 'application/json'}})
+                    .then(function (r2) { return r2.json(); })
+                    .then(function (d) {
+                        kuroThinking(false);
+                        var err = (d && d.summary && d.summary.error) ? d.summary.error : ((res.j && (res.j.message || res.j.error)) || '');
+                        kuroAlert('Review gagal 😿' + (err ? ' — ' + err : ' — pastikan provider AI & API Key sudah diatur di menu API Key, lalu coba lagi.'), 'error');
+                    })
+                    .catch(function () { kuroThinking(false); });
+                return;
+            }
+            kuroThinking(true, 'Kuro sedang membaca dokumen & menyusun saran… 📖');
             pollReview(id);
-        }).catch(function (e) { kuroThinking(false); kuroAlert(e.message); });
+        }).catch(function (e) {
+            kuroThinking(false);
+            kuroAlert((e && e.message) || 'Review gagal dimulai — periksa koneksi lalu coba lagi.', 'error');
+        });
     }
 
     function pollReview(id) {
@@ -1808,10 +1878,10 @@
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
                     if (data.status === 'reviewing') {
-                        if (tries > 15) {
+                        if (tries > 40) {
                             clearInterval(polls[id]);
                             polls[id] = null;
-                            kuroThinking(false, 'Review masih diproses 😿');
+                            kuroThinking(false, 'Review masih diproses — buka lagi nanti 😿');
                         }
                         return;
                     }
@@ -1820,10 +1890,17 @@
                     loadDocs();
                     if (currentDocId === id) {
                         if (data.status === 'reviewed') {
-                            kuroThinking(false, 'Review selesai! ✅ (' + (data.highlights_count || 0) + ' temuan)');
+                            var n = data.highlights_count || 0;
+                            var s = (data.summary || {});
+                            var skor = (s.score != null) ? '\nSkor AI: ' + s.score + '/100' : '';
+                            var overall = s.overall ? '\n\n' + s.overall : '';
+                            kuroThinking(false);
+                            kuroAlert('Review selesai! ✅ ' + n + ' temuan & saran' + skor + (n ? '' : ' — dokumen sudah rapi menurut AI.') + overall, 'success');
                             openDoc(id);
                         } else {
-                            kuroThinking(false, 'Review gagal 😿');
+                            var err = data.summary && data.summary.error ? data.summary.error : '';
+                            kuroThinking(false);
+                            kuroAlert('Review gagal 😿' + (err ? ' — ' + err : ' — cek provider AI & API Key di menu API Key, lalu coba lagi.'), 'error');
                             openDoc(id);
                         }
                     }
