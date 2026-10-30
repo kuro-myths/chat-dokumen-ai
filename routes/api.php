@@ -14,7 +14,6 @@ use Illuminate\Support\Facades\Route;
 
 // ---------- Dokumen (DOCX) ----------
 Route::apiResource('documents', DocumentController::class)->only(['index', 'store', 'show', 'destroy']);
-Route::post('documents/{document}/sections', [DocumentController::class, 'addSection']);
 Route::get('documents/{document}/export', [DocumentController::class, 'export']);
 Route::post('documents/{document}/reimport', [DocumentController::class, 'reimport']); // impor ulang dokumen macet
 
@@ -32,9 +31,6 @@ Route::get('documents/{document}/comments', [CommentController::class, 'index'])
 Route::post('documents/{document}/comments', [CommentController::class, 'store']);
 Route::post('comments/{comment}/reply', [CommentController::class, 'reply']);
 Route::patch('comments/{comment}/resolve', [CommentController::class, 'resolve']);
-
-// ---------- Auto Voice Input ----------
-Route::post('voice/transcribe', [VoiceController::class, 'store']);
 
 // ---------- Suara Kuro (TTS Indonesia ala anime, via Gemini) ----------
 Route::post('voice/speak', [VoiceController::class, 'speak']);

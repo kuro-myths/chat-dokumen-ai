@@ -67,15 +67,6 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        Schema::create('transcriptions', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('document_id')->nullable()->constrained()->cascadeOnDelete();
-            $table->string('audio_path');
-            $table->text('text');
-            $table->float('duration')->nullable();
-            $table->timestamps();
-        });
-
         Schema::create('ai_settings', function (Blueprint $table) {
             $table->id();
             $table->string('slug')->unique();
@@ -93,7 +84,7 @@ return new class extends Migration
     public function down(): void
     {
         foreach ([
-            'ai_settings', 'transcriptions', 'highlights', 'comments',
+            'ai_settings', 'highlights', 'comments',
             'document_versions', 'document_sections', 'documents',
         ] as $table) {
             Schema::dropIfExists($table);

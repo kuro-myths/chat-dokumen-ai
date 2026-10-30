@@ -33,8 +33,4 @@ class Document extends Model
         return $this->hasMany(DocumentVersion::class);
     }
 
-    public function transcriptions(): HasMany
-    {
-        return $this->hasMany(Transcription::class);
-    }
 }

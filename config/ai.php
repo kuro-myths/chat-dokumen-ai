@@ -99,20 +99,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Auto voice input (speech-to-text)
-    | Endpoint kompatibel Whisper: OpenAI, Groq, lokal (whisper.cpp), dsb.
-    */
-    'voice' => [
-        'base_url' => env('VOICE_BASE_URL', 'https://api.openai.com/v1'),
-        'api_key' => env('VOICE_API_KEY', env('OPENAI_API_KEY')),
-        'model' => env('VOICE_MODEL', 'whisper-1'),
-        'language' => 'id',
-        'auto_insert' => true,         // otomatis masukkan hasil ke dokumen
-        'polish_with_ai' => true,      // rapikan ke bahasa akademik via LLM
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
     | Suara Kuro (TTS) — bahasa Indonesia ala karakter anime, via Gemini
     |--------------------------------------------------------------------------
     | POST /api/voice/speak menerima teks + preset suara. Preset = nama
