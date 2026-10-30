@@ -76,13 +76,23 @@ class OpenAiCompatibleDriver implements AiProviderInterface
                 ->acceptJson()
                 ->get($this->baseUrl().'/models');
 
-            return collect($response->json('data') ?? [])
+            $ids = collect($response->json('data') ?? [])
                 ->pluck('id')
                 ->map(fn ($id) => trim((string) $id))
                 ->filter()
                 ->filter(fn ($id) => ! preg_match('/tts|embed|imagen|image|veo|aqa|audio|live|whisper|moderation/i', $id))
                 ->values()
                 ->all();
+
+            // Model gratis didahulukan — paling tahan bila saldo router habis.
+            usort($ids, function ($a, $b) {
+                $af = stripos($a, 'free') !== false ? 0 : 1;
+                $bf = stripos($b, 'free') !== false ? 0 : 1;
+
+                return $af <=> $bf;
+            });
+
+            return $ids;
         } catch (\Throwable) {
             return [];
         }
@@ -90,6 +100,10 @@ class OpenAiCompatibleDriver implements AiProviderInterface
 
     public function chat(array $messages, array $options = []): AiResponse
     {
+        if (trim((string) ($this->config['api_key'] ?? '')) === '') {
+            throw new RuntimeException('API key untuk "'.$this->name.'" belum diisi — buka menu API Key dan lengkapi dulu.');
+        }
+
         $errors = [];
 
         foreach ($this->modelCandidates($options) as $model) {
@@ -151,11 +165,23 @@ class OpenAiCompatibleDriver implements AiProviderInterface
             );
         }
 
+        // 403 berbayar / saldo habis -> model lain (gratis) mungkin masih bisa.
+        if ($status === 403) {
+            return (bool) preg_match(
+                '/paying customers only|top up|insufficient|credits|billing|quota/i',
+                (string) $response->body()
+            );
+        }
+
         return false;
     }
 
     public function stream(array $messages, array $options = []): \Generator
     {
+        if (trim((string) ($this->config['api_key'] ?? '')) === '') {
+            throw new RuntimeException('API key untuk "'.$this->name.'" belum diisi — buka menu API Key dan lengkapi dulu.');
+        }
+
         foreach ($this->modelCandidates($options) as $model) {
             $client = SymfonyClient::create(timeout: $options['timeout'] ?? 120);
             $response = $client->request('POST', $this->baseUrl().'/chat/completions', [

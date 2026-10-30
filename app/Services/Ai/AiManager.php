@@ -83,6 +83,13 @@ class AiManager
         $errors = [];
 
         foreach ($this->providerOrder($provider) as $name) {
+            // Provider tanpa API key langsung dilewati — tidak buang waktu.
+            if (! $this->providerHasKey($name)) {
+                $errors[] = '['.$name.'] dilewati — API key belum diisi';
+
+                continue;
+            }
+
             try {
                 return $this->provider($name)->chat($messages, $options);
             } catch (\Throwable $e) {
@@ -91,9 +98,27 @@ class AiManager
         }
 
         throw new \RuntimeException(
-            'Semua AI gagal menjawab — sudah otomatis dicoba semua model & provider aktif. Detail: '
-            .implode(' | ', $errors ?: ['tidak ada provider aktif'])
+            'Semua AI gagal menjawab — sudah otomatis dicoba semua model & provider aktif. '
+            .'Detail: '.implode(' | ', $errors ?: ['tidak ada provider aktif'])
+            .'. Solusi cepat: (1) buka menu API Key lalu simpan ulang key Gemini dari '
+            .'aistudio.google.com/api-keys — key format AQ.Ab8... itu SEMENTARA, salin yang baru bila sudah lama; '
+            .'(2) untuk router, jalankan "Sinkron Router & Mode AI" supaya kredensial model diperbarui; '
+            .'(3) model berbayar ditandai BERBAYAR di dropdown — pilih yang GRATIS.'
         );
+    }
+
+    /** Provider dianggap siap coba bila punya API key (ai_settings atau config). */
+    protected function providerHasKey(string $name): bool
+    {
+        if ($setting = $this->findSetting($name)) {
+            $cfg = $setting->config();
+
+            if (trim((string) ($cfg['api_key'] ?? '')) !== '') {
+                return true;
+            }
+        }
+
+        return trim((string) ($this->config['providers'][$name]['api_key'] ?? '')) !== '';
     }
 
     /** Urutan provider yang dicoba: yang diminta -> default -> semua yang aktif. */

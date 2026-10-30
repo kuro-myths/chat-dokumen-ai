@@ -76,6 +76,10 @@ class GeminiDriver implements AiProviderInterface
 
     public function chat(array $messages, array $options = []): AiResponse
     {
+        if (trim((string) ($this->config['api_key'] ?? '')) === '') {
+            throw new RuntimeException('API key Gemini belum diisi — buka menu API Key dan simpan key kamu dulu.');
+        }
+
         foreach ($this->modelCandidates($options) as $model) {
             try {
                 $response = $this->postChat($messages, $options, $model);
@@ -176,7 +180,7 @@ class GeminiDriver implements AiProviderInterface
             $status === 400 && str_contains($message, 'API_KEY_INVALID') =>
                 'API key Gemini tidak valid — salin ulang PENUH dari aistudio.google.com/api-keys (format lama AIza... maupun baru AQ.Ab8... keduanya didukung).',
             $status === 401 || $status === 403 =>
-                'API key Gemini ditolak Google — pastikan kunci lengkap (tidak terpotong), belum dihapus, dan berasal dari AI Studio.',
+                'API key Gemini ditolak Google — pastikan kunci lengkap (tidak terpotong) dan belum dihapus. Key format AQ.Ab8... itu SEMENTARA (bisa kedaluwarsa): buka aistudio.google.com/api-keys, salin key baru, lalu simpan lagi di menu API Key.',
             $status === 404 =>
                 'Model "'.$model.'" tidak tersedia / sudah pensiun — model lain sudah otomatis dicoba; kalau masih gagal, ganti model di dropdown.',
             $status === 429 =>
