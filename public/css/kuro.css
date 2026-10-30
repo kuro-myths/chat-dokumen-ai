@@ -460,3 +460,27 @@ label{display:block;margin:12px 0 6px;font-size:.78rem;color:var(--muted);font-w
 .mm-params{display:flex;flex-wrap:wrap;gap:4px}
 .mm-params code{font-size:.66rem;padding:1px 7px}
 .mm-use{display:flex;width:100%;justify-content:center;margin-top:10px}
+
+
+/* ===== Kartu dokumen di modal (grid — klik kartu untuk lanjut) ===== */
+.doc-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.doc-card{display:flex;flex-direction:column;gap:10px;background:#fff;border:1px solid var(--line);
+  border-radius:14px;padding:14px;cursor:pointer;transition:box-shadow .14s,transform .12s,border-color .14s}
+.doc-card:hover{box-shadow:0 6px 18px rgba(60,40,120,.15);transform:translateY(-2px);border-color:#d9cff0}
+.doc-card-top{display:flex;align-items:flex-start;gap:10px}
+.doc-card-ic{flex:none;width:36px;height:36px;border-radius:11px;background:var(--accent-soft);color:var(--accent);
+  display:flex;align-items:center;justify-content:center;font-size:.9rem}
+.doc-card-top .grow{flex:1;min-width:0}
+.doc-card-top b{display:block;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.doc-card-top small{color:var(--muted);font-size:.7rem}
+.doc-card-stats{display:flex;flex-wrap:wrap;gap:6px}
+.doc-stat{display:inline-flex;align-items:center;gap:6px;background:var(--soft);border:1px solid var(--line);
+  border-radius:999px;padding:3px 10px;font-size:.68rem;color:#4b4570}
+.doc-stat i{font-size:.66rem;color:var(--accent)}
+.doc-card-act{display:flex;gap:8px;align-items:center;margin-top:auto;flex-wrap:wrap}
+.doc-card-act .grow{flex:1}
+.doc-card-act .btn{padding:7px 12px;font-size:.72rem}
+.doc-card-act .review-btn{color:var(--accent)}
+
+/* Tombol "Terima semua revisi" di panel temuan */
+.doc-find-all{margin:2px 0 8px}

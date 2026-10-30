@@ -10,13 +10,21 @@ use App\Services\Docx\DocxParserService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 class DocumentController extends Controller
 {
+    /**
+     * Daftar dokumen + statistik kartu (jumlah paragraf & temuan AI)
+     * untuk kartu dokumen di popup beranda.
+     */
     public function index()
     {
-        return Document::latest()->get(['id', 'title', 'type', 'status', 'created_at']);
+        return Document::query()
+            ->withCount(['sections', 'highlights'])
+            ->latest()
+            ->get(['id', 'title', 'type', 'status', 'created_at', 'updated_at']);
     }
 
     /** Upload .docx skripsi/proposal lalu impor paragrafnya. */
@@ -32,7 +40,19 @@ class DocumentController extends Controller
             'source_path' => $path,
         ]);
 
-        $parser->import($document, Storage::disk('local')->path($path));
+        try {
+            $parser->import($document, Storage::disk('local')->path($path));
+        } catch (Throwable $e) {
+            report($e);
+
+            $document->delete();
+            Storage::disk('local')->delete($path);
+
+            return response()->json([
+                'message' => 'Dokumen gagal dibaca: pastikan file .docx valid (bukan .doc lama, bukan file rusak/terproteksi password), lalu unggah ulang.',
+                'error' => $e->getMessage(),
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
 
         return response()->json([
             'message' => 'Dokumen berhasil diimpor.',
@@ -51,7 +71,7 @@ class DocumentController extends Controller
     }
 
     /** Unduh .docx dengan highlight warna + laporan review AI. */
-    public function export(Document $document, DocxExportService $exporter): BinaryFileResponse
+    public function export(Document $document, DocxExportService $exporter): Response
     {
         $path = $exporter->export($document);
 

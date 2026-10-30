@@ -1,1 +1,1 @@
-web: cp -n .env.example .env; export PHP_CLI_SERVER_WORKERS=4; php artisan key:generate --force; php artisan migrate --force; php artisan storage:link; php artisan serve --host 0.0.0.0 --port=$PORT
+web: cp -n .env.example .env; export PHP_CLI_SERVER_WORKERS=4; php artisan key:generate --force; php artisan migrate --force; php artisan storage:link; php -d variables_order=EGPCS -d upload_max_filesize=64M -d post_max_size=70M -d memory_limit=512M -d max_execution_time=300 -d max_input_time=300 -S 0.0.0.0:$PORT server.php
