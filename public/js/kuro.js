@@ -1527,7 +1527,7 @@
         chatInput.focus();
     });
 
-    // ---------- Mode Berbicara (AI membacakan jawaban — TTS browser) ----------
+    // ---------- Mode Berbicara (AI membacakan jawaban — suara ala anime via Gemini TTS) ----------
     var speakMode = false;
     try { speakMode = localStorage.getItem('kuro_speak') === 'on'; } catch (e) {}
     var speakState = document.getElementById('am-speak-state');
@@ -1544,26 +1544,53 @@
         }
     }
     function speak(text) {
-        if (!speakMode || !window.speechSynthesis || !text) return;
-        try {
-            window.speechSynthesis.cancel();
-            var u = new SpeechSynthesisUtterance(String(text).slice(0, 4000));
-            u.lang = 'id-ID';
-            u.rate = 1;
-            var voices = window.speechSynthesis.getVoices() || [];
-            for (var i = 0; i < voices.length; i++) {
-                if (/id[-_]ID|Indones/i.test(voices[i].lang + ' ' + voices[i].name)) { u.voice = voices[i]; break; }
-            }
-            window.speechSynthesis.speak(u);
-        } catch (e) {}
+        if (!speakMode || !text) return;
+        speakServer(String(text).slice(0, 4000), null);
     }
-    // ---------- AI bicara per pesan: tombol "Dengarkan" di tiap jawaban AI ----------
+    // ---------- AI bicara: suara Kuro ala anime Indonesia (Gemini TTS) ----------
+    // Prioritas suara AI ala anime dari server (butuh API key Gemini);
+    // bila belum ada key / server gagal -> fallback otomatis ke suara browser.
     var speakingBtn = null;
+    var speakAudio = null;   // objek Audio hasil TTS Gemini
+    var speakToken = 0;      // pembatalan bila user menekan tombol saat menunggu
+    var ttsWarned = false;   // toast "butuh key" cukup sekali per sesi
     var SPEAK_HTML = '<i class="fa-solid fa-volume-high"></i> Dengarkan';
     var STOP2_HTML = '<i class="fa-solid fa-stop"></i> Berhenti';
+    var WAIT_HTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyiapkan suara…';
+
+    // Preset suara Kuro — sama dengan config/ai.php (tts.voices).
+    var KURO_VOICES = [
+        {id: 'anime',   label: 'Anime Ceria'},
+        {id: 'energik', label: 'Anime Energik'},
+        {id: 'lembut',  label: 'Anime Lembut'},
+        {id: 'santai',  label: 'Santai Breezy'},
+        {id: 'netral',  label: 'Netral Jelas'}
+    ];
+    var voiceId = 'anime';
+    try {
+        var savedVoice = localStorage.getItem('kuro_voice');
+        if (savedVoice && KURO_VOICES.some(function (v) { return v.id === savedVoice; })) voiceId = savedVoice;
+    } catch (e) {}
+
+    function voiceLabel() {
+        for (var i = 0; i < KURO_VOICES.length; i++) {
+            if (KURO_VOICES[i].id === voiceId) return KURO_VOICES[i].label;
+        }
+        return 'Anime Ceria';
+    }
+
+    function applyVoiceState() {
+        var el = document.getElementById('am-voice-state');
+        if (el) el.textContent = voiceLabel();
+    }
 
     function stopSpeakBtn() {
+        speakToken++;
         try { window.speechSynthesis.cancel(); } catch (e) {}
+        if (speakAudio) {
+            try { speakAudio.pause(); } catch (e) {}
+            speakAudio = null;
+        }
         if (speakingBtn) {
             speakingBtn.classList.remove('on');
             speakingBtn.innerHTML = SPEAK_HTML;
@@ -1571,36 +1598,97 @@
         }
     }
 
-    function pickIdVoice(u) {
-        var voices = window.speechSynthesis.getVoices() || [];
-        for (var i = 0; i < voices.length; i++) {
-            if (/id[-_]ID|Indones/i.test(voices[i].lang + ' ' + voices[i].name)) { u.voice = voices[i]; break; }
-        }
+    // Putar hasil TTS dari server (data URI audio/wav).
+    function playSpeakAudio(dataUri, btn) {
+        speakAudio = new Audio(dataUri);
+        speakAudio.onended = stopSpeakBtn;
+        speakAudio.onerror = function () {
+            stopSpeakBtn();
+            if (btn) kuroAlert('Gagal memutar suara dari AI — coba lagi.');
+        };
+        if (btn) btn.innerHTML = STOP2_HTML;
+        speakAudio.play().catch(function () {
+            stopSpeakBtn();
+            if (btn) kuroAlert('Browser memblokir pemutaran audio — tekan tombol Dengarkan lagi.');
+        });
     }
 
-    function speakMessage(text, btn) {
-        if (!window.speechSynthesis) { kuroAlert('Browser belum mendukung text-to-speech — coba Chrome/Edge terbaru.'); return; }
-        if (speakingBtn === btn) { stopSpeakBtn(); return; }
-        stopSpeakBtn();
+    // Fallback: suara browser bila suara AI belum tersedia.
+    function speakBrowser(text, btn) {
+        if (!window.speechSynthesis) {
+            stopSpeakBtn();
+            if (btn) kuroAlert('Browser belum mendukung text-to-speech — coba Chrome/Edge terbaru.');
+            return;
+        }
         try {
-            var u = new SpeechSynthesisUtterance(String(text).slice(0, 4000));
+            var u = new SpeechSynthesisUtterance(text);
             u.lang = 'id-ID';
             u.rate = 1;
-            pickIdVoice(u);
+            var voices = window.speechSynthesis.getVoices() || [];
+            for (var i = 0; i < voices.length; i++) {
+                if (/id[-_]ID|Indones/i.test(voices[i].lang + ' ' + voices[i].name)) { u.voice = voices[i]; break; }
+            }
             u.onend = stopSpeakBtn;
             u.onerror = stopSpeakBtn;
             window.speechSynthesis.speak(u);
-            speakingBtn = btn;
-            btn.classList.add('on');
-            btn.innerHTML = STOP2_HTML;
+            if (btn) btn.innerHTML = STOP2_HTML;
         } catch (e) {
             stopSpeakBtn();
-            kuroAlert('Gagal memutar suara: ' + e.message);
+            if (btn) kuroAlert('Gagal memutar suara: ' + e.message);
         }
+    }
+
+    // Minta suara ala anime ke server, lalu putar.
+    function speakServer(text, btn, tok) {
+        fetch('/api/voice/speak', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF},
+            body: JSON.stringify({text: text, voice: voiceId})
+        }).then(function (r) { return r.json(); }).then(function (d) {
+            if (tok && tok !== speakToken) return; // dibatalkan user saat menunggu
+            if (d.ok && d.audio) {
+                playSpeakAudio(d.audio, btn);
+            } else {
+                if (d.need_key && !ttsWarned) {
+                    ttsWarned = true;
+                    kuroToast('Suara anime butuh API key Gemini — sementara pakai suara browser.', 'err');
+                }
+                speakBrowser(text, btn);
+            }
+        }).catch(function () {
+            if (tok && tok !== speakToken) return;
+            speakBrowser(text, btn);
+        });
+    }
+
+    // Tombol "Dengarkan" di tiap jawaban AI.
+    function speakMessage(text, btn) {
+        if (speakingBtn === btn) { stopSpeakBtn(); return; }
+        stopSpeakBtn();
+        speakingBtn = btn;
+        var tok = speakToken;
+        btn.classList.add('on');
+        btn.innerHTML = WAIT_HTML;
+        speakServer(String(text).slice(0, 4000), btn, tok);
     }
 
     applySpeak();
     if (window.speechSynthesis) { try { window.speechSynthesis.getVoices(); } catch (e) {} }
+    applyVoiceState();
+    var voiceItem = document.getElementById('am-voice');
+    if (voiceItem) {
+        voiceItem.addEventListener('click', function () {
+            attachMenu.classList.remove('open');
+            var idx = 0;
+            for (var i = 0; i < KURO_VOICES.length; i++) {
+                if (KURO_VOICES[i].id === voiceId) { idx = i; break; }
+            }
+            voiceId = KURO_VOICES[(idx + 1) % KURO_VOICES.length].id;
+            try { localStorage.setItem('kuro_voice', voiceId); } catch (e) {}
+            applyVoiceState();
+            kuroToast('Suara Kuro: ' + voiceLabel() + ' 🎀', 'ok');
+        });
+    }
     document.getElementById('am-speak').addEventListener('click', function () {
         attachMenu.classList.remove('open');
         speakMode = !speakMode;
@@ -1735,6 +1823,16 @@
         p.textContent = s.error
             ? 'Review gagal: ' + s.error
             : (hasScore ? 'Skor AI: ' + s.score + '/100. ' : '') + (s.overall || '');
+        if (!s.error && p.textContent) {
+            var sumSpeak = document.createElement('button');
+            sumSpeak.type = 'button';
+            sumSpeak.className = 'btn small ghost msg-speak';
+            sumSpeak.style.marginTop = '8px';
+            sumSpeak.innerHTML = '<i class="fa-solid fa-volume-high"></i> Dengarkan';
+            sumSpeak.addEventListener('click', function () { speakMessage(p.textContent, sumSpeak); });
+            p.appendChild(document.createElement('br'));
+            p.appendChild(sumSpeak);
+        }
         box.insertBefore(p, box.firstChild.nextSibling);
     }
 
