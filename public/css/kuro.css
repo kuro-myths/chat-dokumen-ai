@@ -484,3 +484,11 @@ label{display:block;margin:12px 0 6px;font-size:.78rem;color:var(--muted);font-w
 
 /* Tombol "Terima semua revisi" di panel temuan */
 .doc-find-all{margin:2px 0 8px}
+
+/* ===== AI bicara (TTS): tombol "Dengarkan" per pesan + toggle di composer ===== */
+.msg .msg-txt{white-space:pre-wrap;word-wrap:break-word}
+.msg-acts{display:flex;justify-content:flex-end;margin-top:8px}
+.msg-speak{padding:5px 12px;font-size:.7rem}
+.msg-speak.on{background:var(--accent-soft);color:var(--accent);border-color:#d9cff0;box-shadow:none}
+.cp-btn.on{background:var(--ok-bg);color:var(--ok)}
+#btn-speak.on{background:var(--ok-bg);color:var(--ok)}
