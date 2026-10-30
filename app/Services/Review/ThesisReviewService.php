@@ -13,14 +13,38 @@ use Illuminate\Support\Str;
 /**
  * Review dokumen skripsi/proposal oleh AI:
  * paragraf di-batch -> dianalisis -> temuan menjadi Highlight + Komentar.
+ *
+ * Diproses PER-BATCH (reviewChunk) supaya setiap request HTTP tetap pendek —
+ * dokumen panjang tidak lagi membuat request menggantung berlama-lama.
+ * Progres (cursor) tersimpan di kolom review_summary sehingga proses bisa
+ * dilanjutkan dari batch terakhir bila terputus di tengah jalan.
  */
 class ThesisReviewService
 {
     /**
-     * $provider & $model berasal dari dropdown di composer (null = default
-     * provider) — semua model di dropdown bisa dipakai untuk analisis ini.
+     * Review penuh (semua batch sekaligus) — untuk dokumen pendek / testing.
+     *
+     * @return array<string, mixed>
      */
     public function review(Document $document, ?string $provider = null, ?string $model = null): array
+    {
+        do {
+            $progress = $this->reviewChunk($document, $provider, $model);
+        } while ($progress['done'] < $progress['total']);
+
+        return $document->fresh()->review_summary ?? [];
+    }
+
+    /**
+     * Proses SATU batch per pemanggilan — request selalu pendek, progres
+     * dilaporkan ke frontend, dan cursor aman dari kegagalan/timeout.
+     *
+     * $provider & $model berasal dari dropdown di composer (null = default
+     * provider) — semua model di dropdown bisa dipakai untuk analisis ini.
+     *
+     * @return array{done:int, total:int, issues:int}
+     */
+    public function reviewChunk(Document $document, ?string $provider = null, ?string $model = null): array
     {
         $sections = $document->sections()->orderBy('index')->get()->values();
 
@@ -28,16 +52,25 @@ class ThesisReviewService
             throw new \RuntimeException('Dokumen belum diimpor: tidak ada paragraf.');
         }
 
-        // Reset review sebelumnya
-        $document->highlights()->delete();
-        $document->comments()->where('is_ai', true)->delete();
-
         $config = config('ai.review');
+        $chunks = $sections->chunk($config['batch_sections'])->values();
+        $total = $chunks->count();
+
+        $summary = $document->review_summary;
+
+        // Mulai sesi baru bila belum ada cursor (dokumen baru / sesi lama macet).
+        if (! is_array($summary) || ! array_key_exists('cursor', $summary)) {
+            $document->highlights()->delete();
+            $document->comments()->where('is_ai', true)->delete();
+            $summary = ['cursor' => 0, 'issues' => 0, 'batches' => 0, 'score' => null, 'overall' => null];
+        }
+
+        $cursor = (int) ($summary['cursor'] ?? 0);
         $ai = Ai::provider($provider);
 
-        $summary = ['issues' => 0, 'batches' => 0, 'score' => null, 'overall' => null];
+        if ($cursor < $total) {
+            $batch = $chunks[$cursor];
 
-        foreach ($sections->chunk($config['batch_sections']) as $batch) {
             $response = $ai->chat(
                 [
                     ['role' => 'system', 'content' => ThesisReviewPrompts::system($document->type)],
@@ -52,13 +85,13 @@ class ThesisReviewService
             );
 
             $data = $response->json();
-            $summary['batches']++;
+            $summary['batches'] = ($summary['batches'] ?? 0) + 1;
 
             $issues = array_slice($data['issues'] ?? [], 0, $config['max_issues_per_batch']);
 
             foreach ($issues as $issue) {
                 $this->persistIssue($document, $batch->values(), $issue);
-                $summary['issues']++;
+                $summary['issues'] = ($summary['issues'] ?? 0) + 1;
             }
 
             if (isset($data['score'])) {
@@ -68,11 +101,20 @@ class ThesisReviewService
             if (isset($data['overall'])) {
                 $summary['overall'] = $data['overall'];
             }
+
+            $summary['cursor'] = $cursor + 1;
         }
 
-        $document->update(['status' => 'reviewed', 'review_summary' => $summary]);
+        $done = (int) $summary['cursor'];
 
-        return $summary;
+        if ($done >= $total) {
+            unset($summary['cursor']); // selesai — review berikutnya mulai sesi baru
+            $document->update(['status' => 'reviewed', 'review_summary' => $summary]);
+        } else {
+            $document->update(['status' => 'reviewing', 'review_summary' => $summary]);
+        }
+
+        return ['done' => $done, 'total' => $total, 'issues' => (int) ($summary['issues'] ?? 0)];
     }
 
     /** @param Collection $batch */

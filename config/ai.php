@@ -94,7 +94,7 @@ return [
         'batch_sections' => 8,          // jumlah paragraf per batch request
         'max_issues_per_batch' => 25,   // batas temuan per batch
         'temperature' => 0.2,
-        'timeout' => 120,
+        'timeout' => 55, // per-batch: request tetap pendek, tidak dibunuh proxy
     ],
 
     /*
