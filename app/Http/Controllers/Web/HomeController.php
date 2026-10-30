@@ -71,6 +71,7 @@ class HomeController extends Controller
             'document_id' => ['nullable', 'integer'],   // sertakan isi dokumen ini
             'document_from' => ['nullable', 'integer'],  // opsional: hanya BAB terpilih
             'document_to' => ['nullable', 'integer'],
+            'concise' => ['nullable', 'boolean'], // mode ⚡ Singkat & Jelas
         ]);
 
         // Konteks dokumen: bila document_id dikirim, ISI DOKUMEN (atau hanya
@@ -96,6 +97,13 @@ class HomeController extends Controller
             }
         }
 
+        // Mode ⚡ "Singkat & Jelas": user minta jawaban super ringkas lewat toggle.
+        $style = ! empty($data['concise'])
+            ? "\n\nGAYA JAWABAN (WAJIB DIPATUHI): SINGKAT dan JELAS. Maksimal 3-5 "
+                ."kalimat atau 3-5 poin saja. Langsung ke inti, tanpa pembuka/penutup "
+                ."basa-basi, tanpa penjelasan panjang. Pakai poin singkat bila membantu."
+            : '';
+
         $history = collect($data['history'] ?? [])
             ->map(fn ($m) => ['role' => $m['role'], 'content' => mb_substr($m['content'], 0, 8000)])
             ->values()
@@ -117,6 +125,7 @@ class HomeController extends Controller
                         .'(sebut bab/bagian dan halaman bila relevan) — jangan mengaku tidak '
                         .'bisa membacanya.'
                         : '')
+                    .$style
                     .$context,
             ]],
             $history,

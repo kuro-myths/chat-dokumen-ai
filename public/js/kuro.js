@@ -19,6 +19,7 @@
     var chatLog = document.getElementById('chat-log');
     var chatInput = document.getElementById('chat-input');
     var docLinkOn = true; // saat dokumen terbuka, chat otomatis membawa konteks dokumen
+    var conciseOn = false; // mode ⚡ Singkat & Jelas — jawaban super ringkas
 
     function esc(s) {
         return String(s).replace(/[&<>"']/g, function (c) {
@@ -854,7 +855,8 @@
                 model: currentModel, // model dari dropdown model (null = default provider)
                 history: history.slice(0, -1).slice(-20),
                 // Dokumen terbuka + chip aktif -> AI membaca isi dokumen ini.
-                document_id: (MODE === 'doc' && currentDocId && docLinkOn) ? currentDocId : null
+                document_id: (MODE === 'doc' && currentDocId && docLinkOn) ? currentDocId : null,
+                concise: conciseOn // ⚡ jawaban singkat & jelas bila toggle aktif
             })
         }).then(function (r) {
             if (r.status === 419) throw new Error('Sesi sudah berakhir (server baru di-deploy ulang). Muat ulang halaman (tekan F5 / Ctrl+F5), masuk lagi bila diminta, lalu kirim ulang pesanmu.');
@@ -1917,7 +1919,8 @@
                 document_id: currentDocId, // server menyertakan ISI dokumen sebagai konteks
                 document_from: scope ? parseInt(scope[0], 10) : null,
                 document_to: scope ? parseInt(scope[1], 10) : null,
-                history: hist.slice(0, -1).slice(-20)
+                history: hist.slice(0, -1).slice(-20),
+                concise: conciseOn // ⚡ jawaban singkat & jelas bila toggle aktif
             })
         }).then(function (r) { return r.json(); }).then(function (data) {
             if (typing.parentNode) typing.parentNode.removeChild(typing);
@@ -2166,6 +2169,31 @@
             updateDocLinkChip();
             kuroToast(docLinkOn ? 'Chat terhubung ke dokumen aktif 🔗' : 'Konteks dokumen dilepas ✂️', 'ok');
         });
+    })();
+
+    // ---------- Mode ⚡ Singkat & Jelas: jawaban super ringkat ----------
+    function updateConciseBtns() {
+        ['btn-concise', 'dc-concise'].forEach(function (id) {
+            var b = document.getElementById(id);
+            if (b) {
+                b.classList.toggle('on', conciseOn);
+                b.title = conciseOn
+                    ? 'Mode Singkat & Jelas: AKTIF — klik untuk mematikan'
+                    : 'Mode Singkat & Jelas: mati — klik agar jawaban AI singkat & jelas';
+            }
+        });
+    }
+
+    (function () {
+        ['btn-concise', 'dc-concise'].forEach(function (id) {
+            var b = document.getElementById(id);
+            if (b) b.addEventListener('click', function () {
+                conciseOn = !conciseOn;
+                updateConciseBtns();
+                kuroToast(conciseOn ? '⚡ Jawaban jadi singkat & jelas' : 'Mode singkat dimatikan — jawaban normal', 'ok');
+            });
+        });
+        updateConciseBtns();
     })();
 
     // Review otomatis sekali: dokumen baru dibuka & belum pernah diperiksa →

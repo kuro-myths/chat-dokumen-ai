@@ -235,6 +235,10 @@ a{color:var(--accent);text-decoration:none}
 #doc-link-chip{cursor:pointer;user-select:none}
 #doc-link-chip.off{opacity:.55;text-decoration:line-through}
 
+/* Toggle ⚡ Singkat & Jelas (chat utama + Tanya Dokumen) */
+#btn-concise.on{background:var(--ok-bg);color:var(--ok)}
+#dc-concise.on{background:var(--ok-bg);color:var(--ok);border-color:#b7dfc6}
+
 /* ===== Tampilan ala file Word (.docx): lembar kertas di tengah ===== */
 .doc-view{padding:34px 14px 64px;background:linear-gradient(180deg,#edeaf4,#e3e0ee)}
 .doc-page{max-width:820px;margin:0 auto;min-height:1040px;background:#fff;border-radius:3px;

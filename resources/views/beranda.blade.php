@@ -100,6 +100,7 @@
                     <button class="cp-btn" id="btn-save-chat" title="Simpan percakapan"><i class="fa-solid fa-floppy-disk"></i></button>
                     <button class="cp-btn" id="btn-mic" title="Dikte suara (bahasa Indonesia)"><i class="fa-solid fa-microphone"></i></button>
                     <button class="cp-btn" id="btn-speak" title="AI bicara otomatis: mati — klik untuk mengaktifkan"><i class="fa-solid fa-volume-high"></i></button>
+                    <button class="cp-btn" id="btn-concise" title="Mode Singkat & Jelas: mati — klik agar jawaban AI singkat & jelas"><i class="fa-solid fa-bolt"></i></button>
                     <button class="cp-send" id="chat-send" title="Kirim"><i class="fa-solid fa-arrow-up"></i></button>
                 </div>
                 <input type="file" id="attach-file" accept=".docx" style="display:none">
@@ -169,6 +170,7 @@
                         <div class="dc-log" id="dc-log"><p class="dc-empty">Tanya apa saja tentang dokumen ini — Kuro sudah membaca isinya secara utuh. Contoh: &quot;Ringkas bab metodologi&quot; atau &quot;Bagian mana yang paling lemah?&quot;</p></div>
                         <div class="dc-input">
                             <input id="dc-input" type="text" placeholder="Tanya tentang dokumen ini…" autocomplete="off">
+                            <button type="button" class="btn small ghost" id="dc-concise" title="Mode Singkat & Jelas: mati — klik agar jawaban AI singkat & jelas"><i class="fa-solid fa-bolt"></i></button>
                             <button type="button" class="btn small" id="dc-send"><i class="fa-solid fa-paper-plane"></i></button>
                         </div>
                     </div>
@@ -340,7 +342,7 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('js/kuro.js') }}?v=20261030-16"></script>
+<script src="{{ asset('js/kuro.js') }}?v=20261030-17"></script>
 @endpush
 
 
