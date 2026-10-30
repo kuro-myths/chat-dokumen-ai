@@ -10,7 +10,7 @@
 <link rel="icon" type="image/svg+xml" href="{{ asset('img/kuro-logo.svg') }}">
 
 {{-- Style Kuro AI (public/css/kuro.css) — lokal & dimuat pertama agar halaman langsung tampil --}}
-<link rel="stylesheet" href="{{ asset('css/kuro.css') }}?v=20261030-6">
+<link rel="stylesheet" href="{{ asset('css/kuro.css') }}?v=20261030-7">
 
 {{-- Komponen via CDN (Google Fonts + Font Awesome) dimuat ASINKRON lewat
      public/js/asset-loader.js — bukan <link> render-blocking — supaya CDN

@@ -518,3 +518,99 @@ label{display:block;margin:12px 0 6px;font-size:.78rem;color:var(--muted);font-w
 .dv-summary{margin:8px 0 4px;font-size:.78rem;line-height:1.6;color:#33304a;background:var(--accent-soft);
   border:1px solid #d9cff0;border-radius:10px;padding:8px 12px}
 .dv-summary.dv-summary-err{background:var(--err-bg);border-color:#f3c2bd;color:var(--err)}
+
+/* ============================================================
+   ✨ REFRESH UI/UX v3 — tema gelombang gradien (aurora) + animasi halus.
+   Ditumpuk di akhir file (cascade menang) tanpa mengubah struktur HTML,
+   jadi semua fitur & tombol tetap berfungsi.
+   ============================================================ */
+
+/* 1) Latar halaman: aurora gradien lembut */
+body{background:
+  radial-gradient(1100px 520px at 85% -10%, #e6ddff 0%, rgba(230,221,255,0) 60%),
+  radial-gradient(900px 480px at -10% 110%, #dcf2ff 0%, rgba(220,242,255,0) 55%),
+  radial-gradient(700px 400px at 50% 120%, #ffe9f4 0%, rgba(255,233,244,0) 50%),
+  #f8f7ff}
+.main,.chat-col,.chat-log,.landing{background:transparent}
+
+/* 2) Gelombang cahaya bergerak pelan di landing (dekoratif) */
+.landing{position:relative;overflow:hidden}
+.landing>*{position:relative;z-index:1}
+.landing::before,.landing::after{content:"";position:absolute;width:430px;height:430px;border-radius:50%;
+  filter:blur(70px);opacity:.55;pointer-events:none;z-index:0}
+.landing::before{background:radial-gradient(circle,#c9b8ff,transparent 70%);top:-140px;left:-120px;
+  animation:kuro-drift 14s ease-in-out infinite alternate}
+.landing::after{background:radial-gradient(circle,#aee4ff,transparent 70%);bottom:-160px;right:-100px;
+  animation:kuro-drift 18s ease-in-out infinite alternate-reverse}
+@keyframes kuro-drift{0%{transform:translate(0,0) scale(1)}100%{transform:translate(60px,40px) scale(1.18)}}
+
+/* 3) Sapaan besar: teks gradien mengalir */
+.greet{background:linear-gradient(90deg,#6d5efc,#a855f7,#38bdf8,#6d5efc);background-size:300% 100%;
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  animation:kuro-gradient 8s linear infinite}
+@keyframes kuro-gradient{0%{background-position:0% 50%}100%{background-position:300% 50%}}
+
+/* 4) Sidebar: gradien lembut + brand gradien + item hidup */
+.sidebar{background:linear-gradient(180deg,#f3efff 0%,#eef4ff 60%,#f0f9ff 100%)}
+.brand-txt{background:linear-gradient(90deg,#6d5efc,#38bdf8);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.new-chat{background:linear-gradient(135deg,#6d5efc,#8b5cf6);border:none;color:#fff;
+  box-shadow:0 6px 18px rgba(109,94,252,.32);transition:transform .15s,box-shadow .15s}
+.new-chat:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(109,94,252,.45)}
+.side-item{transition:background .15s,transform .15s,color .15s}
+.side-item:hover{transform:translateX(3px)}
+
+/* 5) Kartu statistik: kaca (glassmorphism) + garis gradien di atas tiap kartu */
+.st-card{background:rgba(255,255,255,.72);backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,.95);box-shadow:0 8px 24px rgba(90,70,180,.10);
+  position:relative;overflow:hidden}
+.st-card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,#6d5efc,#a855f7,#38bdf8)}
+.st-card:nth-child(2)::before{background:linear-gradient(90deg,#38bdf8,#6d5efc)}
+.st-card:nth-child(3)::before{background:linear-gradient(90deg,#f472b6,#a855f7)}
+.st-card:nth-child(4)::before{background:linear-gradient(90deg,#34d399,#38bdf8)}
+.st-card:hover{box-shadow:0 14px 34px rgba(90,70,180,.18)}
+
+/* 6) Composer: panel kaca mengambang + fokus bercahaya */
+.composer{background:rgba(255,255,255,.82);backdrop-filter:blur(14px);
+  border:1px solid rgba(255,255,255,.95);box-shadow:0 12px 40px rgba(90,70,180,.16);
+  transition:box-shadow .2s,border-color .2s}
+.composer:focus-within{box-shadow:0 16px 50px rgba(109,94,252,.28);border-color:#d9cff0}
+.cp-btn{transition:transform .18s,background .15s}
+.cp-btn:hover{transform:rotate(90deg)}
+
+/* 7) Tombol: gradien + lift halus */
+.btn:not(.ghost):not(.small):not(.icon){background:linear-gradient(135deg,#6d5efc,#8b5cf6);
+  border:none;color:#fff;transition:transform .15s,box-shadow .15s}
+.btn:not(.ghost):not(.small):not(.icon):hover{transform:translateY(-2px);
+  box-shadow:0 8px 22px rgba(109,94,252,.38)}
+.btn.ghost{background:rgba(255,255,255,.72);transition:transform .15s,box-shadow .15s}
+.btn.ghost:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(90,70,180,.15)}
+
+/* 8) Gelembung chat: hanya bubble terbaru ikut animasi masuk */
+.msg:last-child{animation:kuro-pop .25s ease both}
+@keyframes kuro-pop{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:none}}
+
+/* 9) Kartu dokumen & modal: kaca */
+.doc-card{background:rgba(255,255,255,.8);backdrop-filter:blur(8px)}
+.doc-card{animation:kuro-pop .25s ease both}
+.modal-panel{background:rgba(255,255,255,.92);backdrop-filter:blur(18px);
+  box-shadow:0 30px 80px rgba(50,30,120,.25)}
+.kalert-panel{background:rgba(255,255,255,.95);backdrop-filter:blur(18px)}
+
+/* 10) Overlay Kuro membaca: lebih menonjol */
+.kuro-read-panel{background:rgba(255,255,255,.95);backdrop-filter:blur(16px);
+  border:1px solid #e4dbff;box-shadow:0 20px 60px rgba(109,94,252,.35)}
+
+/* 11) Detail kecil: seleksi, scrollbar gradien */
+::selection{background:#d9cff0}
+::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#b9a8f5,#8b5cf6);border-radius:8px}
+.badge{font-weight:700}
+
+/* 12) Ponsel: blob lebih kecil + hormati preferensi gerak minimal */
+@media (max-width:960px){
+  .landing::before,.landing::after{width:260px;height:260px;filter:blur(50px)}
+}
+@media (prefers-reduced-motion:reduce){
+  .greet,.landing::before,.landing::after,.msg:last-child,.doc-card{animation:none}
+}
