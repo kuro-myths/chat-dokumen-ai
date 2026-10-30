@@ -399,8 +399,8 @@
     function updateModelName() {
         var el = document.getElementById('cp-model-name');
         if (!el) return;
-        el.textContent = currentModel ? shortModel(currentModel) : 'Model otomatis';
-        el.title = currentModel ? currentModel : 'Pakai model default provider aktif';
+        el.textContent = currentModel ? shortModel(currentModel) : 'Otomatis (semua AI)';
+        el.title = currentModel ? currentModel : 'Kalau model error / 503 / pensiun, otomatis ganti model & AI lain sampai jalan';
     }
 
     // ---------- Katalog model: akses, spesifikasi & kemampuan (ala katalog) ----------
@@ -591,7 +591,7 @@
         auto.className = 'cp-prov-item';
         auto.innerHTML =
             '<i class="fa-solid fa-check chk" style="visibility:' + (currentModel ? 'hidden' : 'visible') + '"></i>' +
-            '<span class="grow">Otomatis<small>Model default provider ini</small></span>';
+            '<span class="grow">Otomatis<small>Default provider — kalau error otomatis cari model & AI lain sampai jalan</small></span>';
         auto.addEventListener('click', function () {
             currentModel = null;
             saveModelChoice();
