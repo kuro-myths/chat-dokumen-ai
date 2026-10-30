@@ -113,6 +113,48 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Suara Kuro (TTS) — bahasa Indonesia ala karakter anime, via Gemini
+    |--------------------------------------------------------------------------
+    | POST /api/voice/speak menerima teks + preset suara. Preset = nama
+    | voice Gemini + instruksi gaya (natural language style prompt).
+    | Pilihan voice: Leda, Puck, Achernar, Aoede, Erinome, Kore, dll.
+    */
+    'tts' => [
+        'model' => env('GEMINI_TTS_MODEL', 'gemini-2.5-flash-preview-tts'),
+        'max_chars' => 4000,
+        'default_voice' => 'anime',
+
+        'voices' => [
+            'anime' => [
+                'label' => 'Anime Ceria',
+                'voice' => 'Leda',
+                'style' => 'Read aloud in Indonesian (Bahasa Indonesia) with the voice of a cheerful, cute anime girl character: lively, expressive, warm, slightly playful, with clear pronunciation',
+            ],
+            'energik' => [
+                'label' => 'Anime Energik',
+                'voice' => 'Puck',
+                'style' => 'Read aloud in Indonesian (Bahasa Indonesia) with the voice of an energetic anime character: upbeat, enthusiastic, full of spirit',
+            ],
+            'lembut' => [
+                'label' => 'Anime Lembut',
+                'voice' => 'Achernar',
+                'style' => 'Read aloud in Indonesian (Bahasa Indonesia) with the voice of a soft, sweet anime character: gentle, calm, soothing, tender',
+            ],
+            'santai' => [
+                'label' => 'Santai Breezy',
+                'voice' => 'Aoede',
+                'style' => 'Read aloud in Indonesian (Bahasa Indonesia) with a breezy, relaxed, friendly voice',
+            ],
+            'netral' => [
+                'label' => 'Netral Jelas',
+                'voice' => 'Erinome',
+                'style' => 'Read aloud in Indonesian (Bahasa Indonesia) with a clear, neutral, informative voice',
+            ],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Warna highlight per jenis temuan (format hex untuk PhpWord)
     */
     'highlight' => [

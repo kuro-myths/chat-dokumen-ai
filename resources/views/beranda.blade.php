@@ -74,6 +74,7 @@
                             <button type="button" class="am-item" id="am-image"><span class="ic"><i class="fa-solid fa-image"></i></span> Generate Gambar</button>
                             <button type="button" class="am-item" id="am-video"><span class="ic"><i class="fa-solid fa-video"></i></span> Generate Video</button>
                             <button type="button" class="am-item" id="am-speak"><span class="ic"><i class="fa-solid fa-volume-high"></i></span> Mode Berbicara <b class="am-state" id="am-speak-state">Mati</b></button>
+                            <button type="button" class="am-item" id="am-voice"><span class="ic"><i class="fa-solid fa-cat"></i></span> Suara Kuro <b class="am-state" id="am-voice-state">Anime</b></button>
                         </div>
                     </div>
                     <div class="cp-prov">
@@ -316,7 +317,7 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('js/kuro.js') }}?v=20261030-10"></script>
+<script src="{{ asset('js/kuro.js') }}?v=20261030-11"></script>
 @endpush
 
 

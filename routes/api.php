@@ -36,6 +36,9 @@ Route::patch('comments/{comment}/resolve', [CommentController::class, 'resolve']
 // ---------- Auto Voice Input ----------
 Route::post('voice/transcribe', [VoiceController::class, 'store']);
 
+// ---------- Suara Kuro (TTS Indonesia ala anime, via Gemini) ----------
+Route::post('voice/speak', [VoiceController::class, 'speak']);
+
 // ---------- Integrasi API AI apa pun ----------
 Route::get('ai/providers', [ProviderController::class, 'index']);
 Route::post('ai/providers', [ProviderController::class, 'store']);
