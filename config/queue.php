@@ -2,7 +2,7 @@
 
 return [
 
-    'default' => env('QUEUE_CONNECTION', 'database'),
+    'default' => env('QUEUE_CONNECTION', 'sync'), // sync: job review jalan langsung (Railway tidak punya queue worker)
 
     'connections' => [
 
